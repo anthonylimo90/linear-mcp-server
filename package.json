@@ -1,0 +1,33 @@
+{
+  "name": "linear-mcp-server",
+  "version": "0.1.0",
+  "description": "Linear MCP server",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "linear-mcp-server": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node build/index.js",
+    "setup:claude": "node scripts/setup-claude.mjs"
+  },
+  "dependencies": {
+    "@linear/sdk": "^40.0.0",
+    "@modelcontextprotocol/sdk": "^1.11.4",
+    "dotenv": "^16.5.0",
+    "pino": "^9.7.0",
+    "pino-pretty": "^10.2.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "@types/node": "^22.15.19",
+    "typescript": "^5.8.3"
+  }
+}
