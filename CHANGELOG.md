@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-01-02
+
+### Added
+- **Comprehensive Testing Infrastructure**: Complete testing framework setup for production-ready quality assurance
+  - **Jest Test Framework**: Full TypeScript support with ES modules configuration
+  - **Test Structure**: Organized test directory with unit, integration, and fixture separation
+  - **Mock Strategy**: Comprehensive mocking approach for Linear SDK and MCP protocol
+  - **Test Fixtures**: Realistic test data based on actual Linear API responses
+  - **Coverage Reporting**: HTML, LCOV, and console coverage reports with configurable targets
+- **Testing Documentation**: Detailed testing strategy and best practices guide
+  - **Testing Pyramid**: Unit (76%), Integration (20%), E2E (4%) distribution
+  - **Test Categories**: Service layer, utilities, MCP protocol, and performance testing
+  - **Mock Patterns**: Linear SDK mocking, environment mocking, and transport mocking
+  - **Best Practices**: AAA pattern, isolated tests, descriptive naming, error scenario coverage
+- **Test Scripts**: Multiple test execution modes for different development workflows
+  - `npm test` - Run all tests with coverage
+  - `npm run test:unit` - Unit tests only  
+  - `npm run test:integration` - Integration tests only
+  - `npm run test:watch` - Watch mode for development
+  - `npm run test:coverage` - Detailed coverage reporting
+  - `npm run test:debug` - Verbose debugging output
+- **Test Environment Setup**: Automated test environment configuration
+  - Environment variable mocking for consistent test execution
+  - Global test setup with proper TypeScript and ES modules support
+  - Mock cleanup and reset between test suites
+
+### Technical Improvements
+- **Test Framework Configuration**: Jest configured for TypeScript ES modules with proper path mapping
+- **Mock Architecture**: Structured approach to mocking external dependencies
+- **Coverage Targets**: >90% overall coverage with >95% service layer coverage goals
+- **Test Data Management**: Immutable fixtures with factory functions for dynamic test data
+- **CI/CD Ready**: Test configuration ready for continuous integration workflows
+
+### Development Experience
+- **Testing Best Practices**: Comprehensive guide for writing maintainable tests
+- **Mock Helpers**: Utility functions for consistent mock setup and verification
+- **Error Testing**: Structured approach to testing error scenarios and edge cases
+- **Performance Testing**: Framework for load testing and performance benchmarking
+
 ## [0.3.1] - 2025-01-02
 
 ### Fixed

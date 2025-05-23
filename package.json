@@ -14,7 +14,12 @@
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:debug": "DEBUG_TESTS=1 jest --runInBand --verbose",
     "start": "node build/index.js",
     "setup:claude": "node scripts/setup-claude.mjs",
     "repair:claude": "node scripts/repair-claude-config.mjs",
@@ -30,6 +35,10 @@
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.19",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "ts-jest": "^29.1.2",
+    "@jest/globals": "^29.7.0"
   }
 }
