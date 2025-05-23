@@ -14,15 +14,17 @@ import { linearService } from "./services/linearService.js";
 import {
   SearchIssuesArgs,
   CreateIssueArgs,
+  UpdateIssueArgs,
   SearchIssuesResponse,
   CreateIssueResponse,
+  UpdateIssueResponse,
   GetTeamsResponse,
   Issue,
   Team
 } from "./types.js";
 
 // Initialize app
-logger.info("Starting Linear MCP server...");
+logger.debug("Starting Linear MCP server...");
 
 // Create server
 const server = new Server({
@@ -57,9 +59,11 @@ async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesRespons
     // Map to response format with optimized async processing
     const formattedIssues: Issue[] = await Promise.all(
       issues.map(async (issue) => {
-        const [state, assignee] = await Promise.all([
+        const [state, assignee, team, project] = await Promise.all([
           issue.state ? issue.state : Promise.resolve(null),
-          issue.assignee ? issue.assignee : Promise.resolve(null)
+          issue.assignee ? issue.assignee : Promise.resolve(null),
+          issue.team ? issue.team : Promise.resolve(null),
+          issue.project ? issue.project : Promise.resolve(null)
         ]);
 
         return {
@@ -70,7 +74,18 @@ async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesRespons
           status: state?.name || undefined,
           url: issue.url,
           assignee: assignee?.name || undefined,
-          createdAt: issue.createdAt
+          createdAt: issue.createdAt,
+          team: team ? {
+            id: team.id,
+            name: team.name,
+            key: team.key
+          } : undefined,
+          project: project ? {
+            id: project.id,
+            name: project.name,
+            url: project.url || undefined,
+            status: project.state || undefined
+          } : undefined
         };
       })
     );
@@ -110,10 +125,49 @@ async function createIssue(args: CreateIssueArgs): Promise<CreateIssueResponse> 
       url: issue.url
     };
     
-    logger.info(`Created issue ${response.identifier}`, { id: response.id, url: response.url });
+    logger.debug(`Created issue ${response.identifier}`, { id: response.id, url: response.url });
     return response;
   } catch (error) {
     logger.error('Error creating issue', error instanceof Error ? { error } : undefined);
+    throw error;
+  }
+}
+
+// Helper function to update issue with error handling
+async function updateIssue(args: UpdateIssueArgs): Promise<UpdateIssueResponse> {
+  try {
+    const { issueId, title, description, assigneeId, priority, stateId } = args;
+    
+    // Input validation
+    if (!issueId) {
+      throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
+    }
+    
+    logger.debug('Updating issue', { issueId, title, description, assigneeId, priority, stateId });
+    
+    const issue = await linearService.updateIssue(issueId, {
+      title,
+      description,
+      assigneeId,
+      priority,
+      stateId
+    });
+
+    // Get the current state for status
+    const state = issue.state ? await issue.state : null;
+    
+    const response: UpdateIssueResponse = {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      url: issue.url,
+      status: state?.name || undefined
+    };
+    
+    logger.debug(`Updated issue ${response.identifier}`, { id: response.id, url: response.url });
+    return response;
+  } catch (error) {
+    logger.error('Error updating issue', error instanceof Error ? { error } : undefined);
     throw error;
   }
 }
@@ -136,6 +190,54 @@ async function getTeams(): Promise<GetTeamsResponse> {
     return { teams: formattedTeams };
   } catch (error) {
     logger.error('Error getting teams', error instanceof Error ? { error } : undefined);
+    throw error;
+  }
+}
+
+// Helper function to get issues assigned to the current user
+async function getMyIssues(limit = 50): Promise<SearchIssuesResponse> {
+  try {
+    logger.debug('Fetching my issues', { limit });
+    const issues = await linearService.searchIssues('', undefined, undefined, 'me', limit);
+
+    // Map to response format with optimized async processing
+    const formattedIssues: Issue[] = await Promise.all(
+      issues.map(async (issue) => {
+        const [state, assignee, team, project] = await Promise.all([
+          issue.state ? issue.state : Promise.resolve(null),
+          issue.assignee ? issue.assignee : Promise.resolve(null),
+          issue.team ? issue.team : Promise.resolve(null),
+          issue.project ? issue.project : Promise.resolve(null)
+        ]);
+
+        return {
+          id: issue.id,
+          identifier: issue.identifier,
+          title: issue.title,
+          description: issue.description || undefined,
+          status: state?.name || undefined,
+          url: issue.url,
+          assignee: assignee?.name || undefined,
+          createdAt: issue.createdAt,
+          team: team ? {
+            id: team.id,
+            name: team.name,
+            key: team.key
+          } : undefined,
+          project: project ? {
+            id: project.id,
+            name: project.name,
+            url: project.url || undefined,
+            status: project.state || undefined
+          } : undefined
+        };
+      })
+    );
+
+    logger.debug(`Found ${formattedIssues.length} issues assigned to me`);
+    return { issues: formattedIssues };
+  } catch (error) {
+    logger.error('Error fetching my issues', error instanceof Error ? { error } : undefined);
     throw error;
   }
 }
@@ -203,11 +305,58 @@ const tools = [
     }
   },
   {
+    name: "update_issue",
+    description: "Update an existing issue in Linear",
+    inputSchema: {
+      type: "object",
+      properties: {
+        issueId: {
+          type: "string",
+          description: "Issue ID to update"
+        },
+        title: {
+          type: "string",
+          description: "New issue title"
+        },
+        description: {
+          type: "string",
+          description: "New issue description"
+        },
+        assigneeId: {
+          type: "string",
+          description: "New assignee ID. Use 'me' to assign to current user, empty string to unassign."
+        },
+        priority: {
+          type: "number",
+          description: "New issue priority (0-4)"
+        },
+        stateId: {
+          type: "string",
+          description: "New workflow state ID"
+        }
+      },
+      required: ["issueId"]
+    }
+  },
+  {
     name: "get_teams",
     description: "Get all teams in the workspace",
     inputSchema: {
       type: "object",
       properties: {}
+    }
+  },
+  {
+    name: "get_my_issues",
+    description: "Get issues assigned to the current user in Linear",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Maximum number of issues to return"
+        }
+      }
     }
   }
 ];
@@ -220,7 +369,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls with error handling
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
-  logger.info(`Handling tool call: ${name}`, { arguments: args });
+  logger.debug(`Handling tool call: ${name}`, { arguments: args });
 
   try {
     let result;
@@ -254,15 +403,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
         break;
       }
+      case 'update_issue': {
+        // Type guard validation
+        if (typeof args.issueId !== 'string') {
+          throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
+        }
+        result = await updateIssue({
+          issueId: args.issueId,
+          title: args.title as string,
+          description: args.description as string,
+          assigneeId: args.assigneeId as string,
+          priority: args.priority as number,
+          stateId: args.stateId as string
+        });
+        break;
+      }
       case 'get_teams':
         result = await getTeams();
         break;
+      case 'get_my_issues':
+        result = await getMyIssues(args.limit as number | undefined);
+        break;
       default:
-        throw new AppError(
-          `Tool '${name}' not found`,
-          404,
-          'TOOL_NOT_FOUND'
-        );
+        throw new AppError(`Unknown tool: ${name}`, 400, String(ErrorCode.InvalidRequest));
     }
     
     logger.debug(`Tool call ${name} completed successfully`);
@@ -284,7 +447,7 @@ async function startServer() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    logger.info("Linear MCP Server started and ready to accept connections");
+    logger.debug("Linear MCP Server started and ready to accept connections");
   } catch (error: unknown) {
     logger.error("Failed to start server", { error: error instanceof Error ? error.message : String(error) });
     process.exit(1);
@@ -293,12 +456,12 @@ async function startServer() {
 
 // Handle process signals gracefully
 process.on('SIGINT', () => {
-  logger.info('Received SIGINT, shutting down gracefully...');
+  logger.debug('Received SIGINT, shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  logger.info('Received SIGTERM, shutting down gracefully...');
+  logger.debug('Received SIGTERM, shutting down gracefully...');
   process.exit(0);
 });
 

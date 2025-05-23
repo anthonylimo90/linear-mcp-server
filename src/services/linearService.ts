@@ -12,7 +12,7 @@ export class LinearService {
 
   private constructor() {
     this.client = new LinearClient({ apiKey: config.linearApiKey });
-    logger.info('LinearService initialized');
+    logger.debug('LinearService initialized');
   }
 
   /**
@@ -47,43 +47,44 @@ export class LinearService {
     teamId?: string,
     status?: string,
     assigneeId?: string,
-    limit = 10
+    limit = 50
   ): Promise<Issue[]> {
     try {
-      logger.debug('Searching issues in Linear', { query, teamId, status, assigneeId, limit });
+      // Cap the limit at 250 for performance reasons
+      const cappedLimit = Math.min(limit, 250);
+      
+      logger.debug('Searching issues in Linear', { query, teamId, status, assigneeId, limit: cappedLimit });
 
-      // Build filter for the query
-      let filter = '';
+      // Build filter object using proper Linear API structure
+      const filter: any = {};
 
       if (teamId) {
-        filter += ` team:${teamId}`;
+        filter.team = { id: { eq: teamId } };
       }
 
       if (status) {
-        filter += ` state:${status}`;
+        filter.state = { name: { eq: status } };
       }
 
       if (assigneeId) {
         if (assigneeId === 'me') {
           const viewer = await this.client.viewer;
-          filter += ` assignee:${viewer.id}`;
+          filter.assignee = { id: { eq: viewer.id } };
         } else {
-          filter += ` assignee:${assigneeId}`;
+          filter.assignee = { id: { eq: assigneeId } };
         }
       }
 
-      // Combine user query with filter
-      const fullQuery = `${query}${filter}`;
-      
-      // The Linear SDK types don't match actual API functionality
-      // Use type assertion for the filter
+      // If there's a query, add title search
+      if (query && query.trim()) {
+        filter.title = { containsIgnoreCase: query.trim() };
+      }
+
+      logger.debug('Using filter', { filter });
+
       const issues = await this.client.issues({
-        first: limit,
-        filter: {
-          search: {
-            query: fullQuery
-          }
-        } as any
+        first: cappedLimit,
+        filter: filter
       });
 
       return issues.nodes;
@@ -145,6 +146,52 @@ export class LinearService {
     } catch (error) {
       logger.error('Failed to fetch current user from Linear', error instanceof Error ? { error } : undefined);
       throw new AppError('Failed to fetch current user from Linear', 500, String(ErrorCode.InternalError), error);
+    }
+  }
+
+  /**
+   * Update an existing issue in Linear
+   */
+  public async updateIssue(
+    issueId: string,
+    updates: {
+      title?: string;
+      description?: string;
+      assigneeId?: string;
+      priority?: number;
+      stateId?: string;
+    }
+  ): Promise<Issue> {
+    try {
+      logger.debug('Updating issue in Linear', { issueId, updates });
+      
+      const issueInput: any = {};
+
+      if (updates.title) issueInput.title = updates.title;
+      if (updates.description !== undefined) issueInput.description = updates.description;
+      if (updates.priority !== undefined) issueInput.priority = updates.priority;
+      if (updates.stateId) issueInput.stateId = updates.stateId;
+      
+      if (updates.assigneeId === "me") {
+        const viewer = await this.client.viewer;
+        issueInput.assigneeId = viewer.id;
+      } else if (updates.assigneeId === null || updates.assigneeId === "") {
+        issueInput.assigneeId = null; // Unassign
+      } else if (updates.assigneeId) {
+        issueInput.assigneeId = updates.assigneeId;
+      }
+
+      const issuePayload = await this.client.updateIssue(issueId, issueInput);
+      const issue = issuePayload.issue;
+      
+      if (!issue) {
+        throw new AppError('Failed to update issue', 500, String(ErrorCode.InternalError));
+      }
+      
+      return issue;
+    } catch (error) {
+      logger.error('Failed to update issue in Linear', error instanceof Error ? { error } : undefined);
+      throw new AppError('Failed to update issue in Linear', 500, String(ErrorCode.InternalError), error);
     }
   }
 }

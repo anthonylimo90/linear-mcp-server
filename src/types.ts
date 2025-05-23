@@ -8,6 +8,17 @@ export interface Issue {
   url: string;
   assignee?: string;
   createdAt?: string | Date;
+  team?: {
+    id: string;
+    name: string;
+    key: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+    url?: string;
+    status?: string;
+  };
 }
 
 export interface Team {
@@ -44,6 +55,23 @@ export interface CreateIssueResponse {
   identifier: string;
   title: string;
   url: string;
+}
+
+export interface UpdateIssueArgs {
+  issueId: string;
+  title?: string;
+  description?: string;
+  assigneeId?: string;
+  priority?: number;
+  stateId?: string;
+}
+
+export interface UpdateIssueResponse {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  status?: string;
 }
 
 export interface GetTeamsResponse {

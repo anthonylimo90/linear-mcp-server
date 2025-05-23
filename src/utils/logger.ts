@@ -15,6 +15,7 @@ export class Logger {
       transport: {
         target: 'pino-pretty',
         options: {
+          destination: 2,
           colorize: true,
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',

@@ -34,12 +34,15 @@ function validateConfig() {
     process.exit(1);
   }
 
-  logger.info('Configuration loaded', {
-    port: config.port,
-    logLevel: config.logLevel,
-    enableRateLimit: config.enableRateLimit,
-    environment: config.environment
-  });
+  // Only log configuration in development mode to avoid interfering with MCP stdio communication
+  if (config.environment === 'development' && process.env.LOG_LEVEL === 'debug') {
+    logger.debug('Configuration loaded', {
+      port: config.port,
+      logLevel: config.logLevel,
+      enableRateLimit: config.enableRateLimit,
+      environment: config.environment
+    });
+  }
 }
 
 // Call validation on import
