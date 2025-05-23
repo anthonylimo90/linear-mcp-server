@@ -36,6 +36,18 @@ function getServerPath() {
   return buildPath;
 }
 
+// Clean and validate JSON content
+function cleanJsonContent(content) {
+  // Remove trailing commas before closing braces/brackets
+  content = content.replace(/,(\s*[}\]])/g, '$1');
+  
+  // Remove comments (if any)
+  content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+  content = content.replace(/\/\/.*$/gm, '');
+  
+  return content.trim();
+}
+
 // Read existing config or create new one
 function readOrCreateConfig(configPath) {
   const configDir = path.dirname(configPath);
@@ -48,17 +60,39 @@ function readOrCreateConfig(configPath) {
   // Read existing config or create empty one
   if (fs.existsSync(configPath)) {
     try {
-      const content = fs.readFileSync(configPath, 'utf8');
-      return JSON.parse(content);
+      const rawContent = fs.readFileSync(configPath, 'utf8');
+      const cleanContent = cleanJsonContent(rawContent);
+      
+      if (cleanContent) {
+        const parsed = JSON.parse(cleanContent);
+        return parsed;
+      } else {
+        console.warn('Config file is empty, creating new configuration.');
+        return { mcpServers: {} };
+      }
     } catch (error) {
-      console.warn(`Warning: Could not parse existing config at ${configPath}. Creating backup and starting fresh.`);
+      console.warn(`Warning: Could not parse existing config at ${configPath}. Error: ${error.message}`);
       const backupPath = `${configPath}.backup.${Date.now()}`;
       fs.copyFileSync(configPath, backupPath);
       console.log(`Backup created at ${backupPath}`);
+      console.log('Creating fresh configuration...');
       return { mcpServers: {} };
     }
   } else {
     return { mcpServers: {} };
+  }
+}
+
+// Validate configuration before writing
+function validateConfig(config) {
+  try {
+    // Test if the config can be serialized and parsed
+    const jsonString = JSON.stringify(config, null, 2);
+    JSON.parse(jsonString);
+    return true;
+  } catch (error) {
+    console.error('Configuration validation failed:', error.message);
+    return false;
   }
 }
 
@@ -71,7 +105,7 @@ function getLinearApiKey() {
     const envContent = fs.readFileSync(envPath, 'utf8');
     const match = envContent.match(/LINEAR_API_KEY\s*=\s*(.+)/);
     if (match && match[1] && match[1] !== 'your_linear_api_key_here') {
-      return match[1].trim();
+      return match[1].trim().replace(/['"]/g, ''); // Remove quotes if present
     }
   }
   
@@ -85,7 +119,7 @@ function getLinearApiKey() {
   // Check for command line argument
   const apiKey = process.argv[2];
   if (apiKey && apiKey.length > 10) {
-    return apiKey;
+    return apiKey.replace(/['"]/g, ''); // Remove quotes if present
   }
   
   throw new Error('Linear API key is required. Please provide it via .env file, environment variable, or command line argument.');
@@ -107,22 +141,39 @@ function setupClaude() {
     // Read or create config
     const config = readOrCreateConfig(configPath);
     
-    // Ensure mcpServers exists
-    if (!config.mcpServers) {
+    // Ensure mcpServers exists and is an object
+    if (!config.mcpServers || typeof config.mcpServers !== 'object') {
       config.mcpServers = {};
     }
     
-    // Add Linear MCP server
-    config.mcpServers.linear = {
-      command: 'node',
+    // Create the Linear MCP server configuration
+    const linearConfig = {
+      command: "node",
       args: [serverPath],
       env: {
         LINEAR_API_KEY: apiKey
       }
     };
     
-    // Write config back
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    // Add Linear MCP server
+    config.mcpServers.linear = linearConfig;
+    
+    // Validate the configuration before writing
+    if (!validateConfig(config)) {
+      throw new Error('Generated configuration is invalid');
+    }
+    
+    // Write config back with proper formatting
+    const configJson = JSON.stringify(config, null, 2);
+    fs.writeFileSync(configPath, configJson, 'utf8');
+    
+    // Verify the written file can be read back
+    try {
+      const verification = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      console.log('✅ Configuration file validated successfully');
+    } catch (verifyError) {
+      throw new Error(`Failed to verify written configuration: ${verifyError.message}`);
+    }
     
     console.log('\n✅ Successfully configured Linear MCP Server with Claude Desktop!');
     console.log('\n📋 Next steps:');
@@ -134,8 +185,15 @@ function setupClaude() {
     console.log('   • create_issue - Create new issues in Linear');
     console.log('   • get_teams - List all teams in the workspace');
     
+    console.log(`\n📝 Configuration written to: ${configPath}`);
+    
   } catch (error) {
     console.error('❌ Setup failed:', error.message);
+    console.error('\n🔧 Troubleshooting:');
+    console.error('1. Make sure Claude Desktop is not running during setup');
+    console.error('2. Check that you have write permissions to the config directory');
+    console.error('3. Verify your Linear API key is valid');
+    console.error('4. Try manually removing the config file and running setup again');
     process.exit(1);
   }
 }

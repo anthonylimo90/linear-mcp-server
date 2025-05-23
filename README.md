@@ -460,10 +460,12 @@ Get all teams in the workspace.
 ### Available Scripts
 
 ```bash
-npm run build     # Build TypeScript to JavaScript
-npm run watch     # Watch mode for development
-npm start         # Start the MCP server
-npm test          # Run tests (when implemented)
+npm run build        # Build TypeScript to JavaScript
+npm run watch        # Watch mode for development
+npm start            # Start the MCP server
+npm test             # Run tests (when implemented)
+npm run setup:claude # Auto-configure Claude Desktop
+npm run repair:claude # Fix malformed Claude Desktop config
 ```
 
 ## Troubleshooting
@@ -473,6 +475,29 @@ npm test          # Run tests (when implemented)
 1. **"Missing LINEAR_API_KEY"**: Ensure your `.env` file exists and contains a valid Linear API key
 2. **"Server does not support tools"**: This indicates an MCP client compatibility issue
 3. **"Failed to fetch teams"**: Check your Linear API key permissions
+4. **JSON syntax errors in Claude config**: Use the repair script to fix malformed configuration files
+
+### JSON Configuration Errors
+
+If you see JSON parsing errors like "Unexpected token" or "is not valid JSON" in Claude Desktop:
+
+#### Quick Fix
+```bash
+# Run the repair script to fix JSON syntax issues
+npm run repair:claude
+
+# Then try setting up again
+npm run setup:claude
+```
+
+#### Manual Fix
+1. Close Claude Desktop completely
+2. Navigate to the config file location:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
+   - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+3. Delete the config file (a backup will be created automatically)
+4. Run the setup script again: `npm run setup:claude`
 
 ### Debugging
 

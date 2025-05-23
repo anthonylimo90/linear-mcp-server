@@ -16,7 +16,9 @@
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node build/index.js",
-    "setup:claude": "node scripts/setup-claude.mjs"
+    "setup:claude": "node scripts/setup-claude.mjs",
+    "repair:claude": "node scripts/repair-claude-config.mjs",
+    "reset:claude": "node scripts/force-reset-claude.mjs"
   },
   "dependencies": {
     "@linear/sdk": "^40.0.0",
