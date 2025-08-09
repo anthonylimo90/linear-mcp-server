@@ -95,7 +95,7 @@ describe('LinearService', () => {
 
     it('should handle "me" assignee filter', async () => {
       // Arrange
-      const mockIssues = [];
+      const mockIssues: any[] = [];
       mockLinearClient.issues.mockResolvedValue({ nodes: mockIssues });
       
       // Act
@@ -175,6 +175,19 @@ describe('LinearService', () => {
         title: 'Test Issue',
         assigneeId: 'test-user',
       });
+    });
+
+    it('should throw error when API returns no issue', async () => {
+      // Arrange
+      mockLinearClient.createIssue.mockResolvedValue({ issue: null });
+
+      // Act
+      const service = LinearService.getInstance();
+
+      // Assert
+      await expect(
+        service.createIssue('team-1', 'Test Issue')
+      ).rejects.toThrow();
     });
   });
 
