@@ -36,23 +36,15 @@ tests/
 │   ├── services/
 │   │   └── linearService.test.ts
 │   ├── utils/
-│   │   ├── config.test.ts
-│   │   ├── logger.test.ts
-│   │   └── error.test.ts
-│   └── types.test.ts
+│   │   └── config.test.ts
+│   └── simple.test.ts
 ├── integration/              # Integration tests
-│   ├── mcp-server.test.ts
-│   └── linear-api.test.ts
-├── e2e/                      # End-to-end tests
-│   └── mcp-protocol.test.ts
-├── performance/              # Performance tests
-│   └── load-test.ts
+│   └── mcp-server.test.ts
 ├── fixtures/                 # Test data
 │   ├── linear-responses.ts
 │   └── mcp-requests.ts
 ├── helpers/                  # Test utilities
-│   ├── mocks.ts
-│   └── setup.ts
+│   └── mocks.ts
 └── setup.ts                  # Global test setup
 ```
 
