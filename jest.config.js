@@ -10,7 +10,7 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   
   // Module name mapping for ES modules
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   

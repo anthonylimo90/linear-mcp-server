@@ -14,16 +14,28 @@ interface Config {
   environment: string;
 }
 
+// Parse numeric environment variables with fallback and warnings
+function parseNumeric(value: string | undefined, fallback: number, name: string): number {
+  const parsed = parseInt(value ?? '', 10);
+  if (Number.isNaN(parsed)) {
+    if (value !== undefined) {
+      logger.warn(`Invalid ${name} value: ${value}. Falling back to default ${fallback}`);
+    }
+    return fallback;
+  }
+  return parsed;
+}
+
 /**
  * Application configuration settings
  */
 const config: Config = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseNumeric(process.env.PORT, 3000, 'PORT'),
   logLevel: process.env.LOG_LEVEL || 'info',
   linearApiKey: process.env.LINEAR_API_KEY || '',
   enableRateLimit: process.env.ENABLE_RATE_LIMIT === 'true',
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
-  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute default
+  rateLimitMax: parseNumeric(process.env.RATE_LIMIT_MAX, 100, 'RATE_LIMIT_MAX'),
+  rateLimitWindowMs: parseNumeric(process.env.RATE_LIMIT_WINDOW_MS, 60000, 'RATE_LIMIT_WINDOW_MS'), // 1 minute default
   environment: process.env.NODE_ENV || 'development',
 };
 
