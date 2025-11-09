@@ -8,6 +8,7 @@ import {
   ListToolsRequestSchema,
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
+import { Issue as LinearIssue } from "@linear/sdk";
 import { logger } from "./utils/logger.js";
 import { AppError, handleError } from "./utils/error.js";
 import { linearService } from "./services/linearService.js";
@@ -19,12 +20,65 @@ import {
   CreateIssueResponse,
   UpdateIssueResponse,
   GetTeamsResponse,
+  GetIssueArgs,
+  GetWorkflowStatesArgs,
+  GetWorkflowStatesResponse,
+  AddCommentArgs,
+  AddCommentResponse,
+  HealthCheckResponse,
   Issue,
-  Team
+  Team,
+  WorkflowState
 } from "./types.js";
+import {
+  SearchIssuesSchema,
+  CreateIssueSchema,
+  UpdateIssueSchema,
+  GetMyIssuesSchema,
+  GetIssueSchema,
+  GetWorkflowStatesSchema,
+  AddCommentSchema,
+} from "./utils/validation.js";
+import { ZodError } from "zod";
 
 // Initialize app
 logger.debug("Starting Linear MCP server...");
+
+/**
+ * Formats a Linear SDK issue into our standardized Issue format
+ * @param issue - Linear SDK issue object
+ * @returns Promise resolving to formatted Issue
+ */
+async function formatIssue(issue: LinearIssue): Promise<Issue> {
+  const [state, assignee, team, project] = await Promise.all([
+    issue.state ? issue.state : Promise.resolve(null),
+    issue.assignee ? issue.assignee : Promise.resolve(null),
+    issue.team ? issue.team : Promise.resolve(null),
+    issue.project ? issue.project : Promise.resolve(null)
+  ]);
+
+  return {
+    id: issue.id,
+    identifier: issue.identifier,
+    title: issue.title,
+    description: issue.description || undefined,
+    status: state?.name || undefined,
+    url: issue.url,
+    assignee: assignee?.name || undefined,
+    createdAt: issue.createdAt,
+    team: team ? {
+      id: team.id,
+      name: team.name,
+      key: team.key
+    } : undefined,
+    project: project ? {
+      id: project.id,
+      name: project.name,
+      url: project.url || undefined,
+      status: project.state || undefined
+    } : undefined
+  };
+}
 
 // Create server
 const server = new Server({
@@ -39,15 +93,12 @@ const server = new Server({
 // Helper function to search issues with error handling
 async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesResponse> {
   try {
-    const { query, teamId, status, assigneeId, limit } = args;
-    
-    // Input validation
-    if (!query) {
-      throw new AppError('Search query is required', 400, 'VALIDATION_ERROR');
-    }
+    // Validate input with Zod
+    const validated = SearchIssuesSchema.parse(args);
+    const { query, teamId, status, assigneeId, limit } = validated;
 
     logger.debug('Searching issues', { query, teamId, status, assigneeId, limit });
-    
+
     const issues = await linearService.searchIssues(
       query,
       teamId,
@@ -56,39 +107,8 @@ async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesRespons
       limit
     );
 
-    // Map to response format with optimized async processing
-    const formattedIssues: Issue[] = await Promise.all(
-      issues.map(async (issue) => {
-        const [state, assignee, team, project] = await Promise.all([
-          issue.state ? issue.state : Promise.resolve(null),
-          issue.assignee ? issue.assignee : Promise.resolve(null),
-          issue.team ? issue.team : Promise.resolve(null),
-          issue.project ? issue.project : Promise.resolve(null)
-        ]);
-
-        return {
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          description: issue.description || undefined,
-          status: state?.name || undefined,
-          url: issue.url,
-          assignee: assignee?.name || undefined,
-          createdAt: issue.createdAt,
-          team: team ? {
-            id: team.id,
-            name: team.name,
-            key: team.key
-          } : undefined,
-          project: project ? {
-            id: project.id,
-            name: project.name,
-            url: project.url || undefined,
-            status: project.state || undefined
-          } : undefined
-        };
-      })
-    );
+    // Use shared formatting function
+    const formattedIssues: Issue[] = await Promise.all(issues.map(formatIssue));
 
     logger.debug(`Found ${formattedIssues.length} issues`);
     return { issues: formattedIssues };
@@ -101,13 +121,10 @@ async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesRespons
 // Helper function to create issue with error handling
 async function createIssue(args: CreateIssueArgs): Promise<CreateIssueResponse> {
   try {
-    const { teamId, title, description, assigneeId, priority } = args;
-    
-    // Input validation
-    if (!teamId || !title) {
-      throw new AppError('Team ID and title are required', 400, 'VALIDATION_ERROR');
-    }
-    
+    // Validate input with Zod
+    const validated = CreateIssueSchema.parse(args);
+    const { teamId, title, description, assigneeId, priority } = validated;
+
     logger.debug('Creating issue', { teamId, title, description, assigneeId, priority });
     
     const issue = await linearService.createIssue(
@@ -136,13 +153,10 @@ async function createIssue(args: CreateIssueArgs): Promise<CreateIssueResponse> 
 // Helper function to update issue with error handling
 async function updateIssue(args: UpdateIssueArgs): Promise<UpdateIssueResponse> {
   try {
-    const { issueId, title, description, assigneeId, priority, stateId } = args;
-    
-    // Input validation
-    if (!issueId) {
-      throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
-    }
-    
+    // Validate input with Zod
+    const validated = UpdateIssueSchema.parse(args);
+    const { issueId, title, description, assigneeId, priority, stateId } = validated;
+
     logger.debug('Updating issue', { issueId, title, description, assigneeId, priority, stateId });
     
     const issue = await linearService.updateIssue(issueId, {
@@ -195,50 +209,113 @@ async function getTeams(): Promise<GetTeamsResponse> {
 }
 
 // Helper function to get issues assigned to the current user
-async function getMyIssues(limit = 50): Promise<SearchIssuesResponse> {
+async function getMyIssues(args?: { limit?: number }): Promise<SearchIssuesResponse> {
   try {
+    // Validate input with Zod
+    const validated = GetMyIssuesSchema.parse(args || {});
+    const { limit } = validated;
+
     logger.debug('Fetching my issues', { limit });
     const issues = await linearService.searchIssues('', undefined, undefined, 'me', limit);
 
-    // Map to response format with optimized async processing
-    const formattedIssues: Issue[] = await Promise.all(
-      issues.map(async (issue) => {
-        const [state, assignee, team, project] = await Promise.all([
-          issue.state ? issue.state : Promise.resolve(null),
-          issue.assignee ? issue.assignee : Promise.resolve(null),
-          issue.team ? issue.team : Promise.resolve(null),
-          issue.project ? issue.project : Promise.resolve(null)
-        ]);
-
-        return {
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          description: issue.description || undefined,
-          status: state?.name || undefined,
-          url: issue.url,
-          assignee: assignee?.name || undefined,
-          createdAt: issue.createdAt,
-          team: team ? {
-            id: team.id,
-            name: team.name,
-            key: team.key
-          } : undefined,
-          project: project ? {
-            id: project.id,
-            name: project.name,
-            url: project.url || undefined,
-            status: project.state || undefined
-          } : undefined
-        };
-      })
-    );
+    // Use shared formatting function
+    const formattedIssues: Issue[] = await Promise.all(issues.map(formatIssue));
 
     logger.debug(`Found ${formattedIssues.length} issues assigned to me`);
     return { issues: formattedIssues };
   } catch (error) {
     logger.error('Error fetching my issues', error instanceof Error ? { error } : undefined);
     throw error;
+  }
+}
+
+// Helper function to get a specific issue by ID
+async function getIssue(args: GetIssueArgs): Promise<Issue> {
+  try {
+    // Validate input with Zod
+    const validated = GetIssueSchema.parse(args);
+    const { issueId } = validated;
+
+    logger.debug('Fetching issue by ID', { issueId });
+    const issue = await linearService.getIssue(issueId);
+
+    // Use shared formatting function
+    const formattedIssue: Issue = await formatIssue(issue);
+
+    logger.debug(`Found issue ${formattedIssue.identifier}`);
+    return formattedIssue;
+  } catch (error) {
+    logger.error('Error fetching issue', error instanceof Error ? { error } : undefined);
+    throw error;
+  }
+}
+
+// Helper function to get workflow states for a team
+async function getWorkflowStates(args: GetWorkflowStatesArgs): Promise<GetWorkflowStatesResponse> {
+  try {
+    // Validate input with Zod
+    const validated = GetWorkflowStatesSchema.parse(args);
+    const { teamId } = validated;
+
+    logger.debug('Fetching workflow states', { teamId });
+    const states = await linearService.getWorkflowStates(teamId);
+
+    const formattedStates: WorkflowState[] = states.map((state: any) => ({
+      id: state.id,
+      name: state.name,
+      type: state.type,
+      description: state.description || undefined,
+      position: state.position
+    }));
+
+    logger.debug(`Found ${formattedStates.length} workflow states`);
+    return { states: formattedStates };
+  } catch (error) {
+    logger.error('Error fetching workflow states', error instanceof Error ? { error } : undefined);
+    throw error;
+  }
+}
+
+// Helper function to add a comment to an issue
+async function addComment(args: AddCommentArgs): Promise<AddCommentResponse> {
+  try {
+    // Validate input with Zod
+    const validated = AddCommentSchema.parse(args);
+    const { issueId, body } = validated;
+
+    logger.debug('Adding comment to issue', { issueId, bodyLength: body.length });
+    const comment = await linearService.addComment(issueId, body);
+
+    const response: AddCommentResponse = {
+      id: comment.id,
+      body: comment.body,
+      createdAt: comment.createdAt.toString(),
+      issueId: issueId
+    };
+
+    logger.debug(`Added comment to issue`, { commentId: response.id });
+    return response;
+  } catch (error) {
+    logger.error('Error adding comment', error instanceof Error ? { error } : undefined);
+    throw error;
+  }
+}
+
+// Helper function for health check
+async function healthCheck(): Promise<HealthCheckResponse> {
+  try {
+    logger.debug('Performing health check');
+    const result = await linearService.healthCheck();
+    logger.debug('Health check completed', { status: result.status });
+    return result;
+  } catch (error) {
+    logger.error('Error during health check', error instanceof Error ? { error } : undefined);
+    // Health check should not throw, return unhealthy status instead
+    return {
+      status: 'unhealthy',
+      apiConnected: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
 
@@ -358,6 +435,60 @@ const tools = [
         }
       }
     }
+  },
+  {
+    name: "get_issue",
+    description: "Get a specific issue by ID from Linear",
+    inputSchema: {
+      type: "object",
+      properties: {
+        issueId: {
+          type: "string",
+          description: "The ID of the issue to retrieve"
+        }
+      },
+      required: ["issueId"]
+    }
+  },
+  {
+    name: "get_workflow_states",
+    description: "Get all workflow states for a team in Linear",
+    inputSchema: {
+      type: "object",
+      properties: {
+        teamId: {
+          type: "string",
+          description: "The ID of the team"
+        }
+      },
+      required: ["teamId"]
+    }
+  },
+  {
+    name: "add_comment",
+    description: "Add a comment to an issue in Linear",
+    inputSchema: {
+      type: "object",
+      properties: {
+        issueId: {
+          type: "string",
+          description: "The ID of the issue to comment on"
+        },
+        body: {
+          type: "string",
+          description: "The comment text"
+        }
+      },
+      required: ["issueId", "body"]
+    }
+  },
+  {
+    name: "health_check",
+    description: "Check the health and connectivity of the Linear API",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
   }
 ];
 
@@ -422,16 +553,53 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await getTeams();
         break;
       case 'get_my_issues':
-        result = await getMyIssues(args.limit as number | undefined);
+        result = await getMyIssues(args as { limit?: number });
+        break;
+      case 'get_issue': {
+        // Type guard validation
+        if (typeof args.issueId !== 'string') {
+          throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
+        }
+        result = await getIssue({ issueId: args.issueId });
+        break;
+      }
+      case 'get_workflow_states': {
+        // Type guard validation
+        if (typeof args.teamId !== 'string') {
+          throw new AppError('Team ID is required', 400, 'VALIDATION_ERROR');
+        }
+        result = await getWorkflowStates({ teamId: args.teamId });
+        break;
+      }
+      case 'add_comment': {
+        // Type guard validation
+        if (typeof args.issueId !== 'string' || typeof args.body !== 'string') {
+          throw new AppError('Issue ID and comment body are required', 400, 'VALIDATION_ERROR');
+        }
+        result = await addComment({ issueId: args.issueId, body: args.body });
+        break;
+      }
+      case 'health_check':
+        result = await healthCheck();
         break;
       default:
         throw new AppError(`Unknown tool: ${name}`, 400, String(ErrorCode.InvalidRequest));
     }
-    
+
     logger.debug(`Tool call ${name} completed successfully`);
     return { toolResult: result };
-    
+
   } catch (error: unknown) {
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      const validationErrors = error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Validation error: ${validationErrors}`,
+        { code: 'VALIDATION_ERROR', details: error.errors }
+      );
+    }
+
     // Convert error to proper McpError format
     const errorResponse = handleError(error);
     throw new McpError(

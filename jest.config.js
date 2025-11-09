@@ -12,8 +12,9 @@ export default {
   // Module name mapping for ES modules
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^p-throttle$': '<rootDir>/__mocks__/p-throttle.js',
   },
-  
+
   // Transform configuration
   transform: {
     '^.+\\.ts$': ['ts-jest', {

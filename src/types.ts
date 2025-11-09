@@ -61,7 +61,7 @@ export interface UpdateIssueArgs {
   issueId: string;
   title?: string;
   description?: string;
-  assigneeId?: string;
+  assigneeId?: string | null;
   priority?: number;
   stateId?: string;
 }
@@ -76,4 +76,44 @@ export interface UpdateIssueResponse {
 
 export interface GetTeamsResponse {
   teams: Team[];
+}
+
+export interface GetIssueArgs {
+  issueId: string;
+}
+
+export interface GetWorkflowStatesArgs {
+  teamId: string;
+}
+
+export interface AddCommentArgs {
+  issueId: string;
+  body: string;
+}
+
+export interface WorkflowState {
+  id: string;
+  name: string;
+  type: string;
+  description?: string;
+  position: number;
+}
+
+export interface GetWorkflowStatesResponse {
+  states: WorkflowState[];
+}
+
+export interface AddCommentResponse {
+  id: string;
+  body: string;
+  createdAt: string;
+  issueId: string;
+}
+
+export interface HealthCheckResponse {
+  status: 'healthy' | 'unhealthy';
+  apiConnected: boolean;
+  userId?: string;
+  userName?: string;
+  error?: string;
 } 
