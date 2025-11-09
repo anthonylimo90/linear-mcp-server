@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
+import { LinearClient } from '@linear/sdk';
 
 /**
  * Setup script for integrating Linear MCP Server with Claude Desktop
@@ -30,9 +32,26 @@ function getClaudeConfigPath() {
 // Get the absolute path to the built server
 function getServerPath() {
   const buildPath = path.resolve(__dirname, '..', 'build', 'index.js');
+
   if (!fs.existsSync(buildPath)) {
-    throw new Error(`Server build not found at ${buildPath}. Please run 'npm run build' first.`);
+    console.log('⚠️  Build directory not found. Running npm run build...');
+    try {
+      const projectRoot = path.resolve(__dirname, '..');
+      execSync('npm run build', {
+        cwd: projectRoot,
+        stdio: 'inherit'
+      });
+      console.log('✅ Build completed successfully!');
+
+      // Verify build was created
+      if (!fs.existsSync(buildPath)) {
+        throw new Error('Build failed to create output files');
+      }
+    } catch (error) {
+      throw new Error(`Failed to build project: ${error.message}\n\nPlease run 'npm run build' manually and try again.`);
+    }
   }
+
   return buildPath;
 }
 
@@ -125,18 +144,54 @@ function getLinearApiKey() {
   throw new Error('Linear API key is required. Please provide it via .env file, environment variable, or command line argument.');
 }
 
+// Verify API key by testing connection to Linear
+async function verifyApiKey(apiKey) {
+  try {
+    console.log('\n🔍 Verifying API key...');
+    const client = new LinearClient({ apiKey });
+    const viewer = await client.viewer;
+    const teams = await client.teams();
+
+    return {
+      success: true,
+      userName: viewer.name,
+      userEmail: viewer.email,
+      teamCount: teams.nodes.length,
+      teams: teams.nodes.map(team => ({
+        id: team.id,
+        name: team.name,
+        key: team.key
+      }))
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // Main setup function
-function setupClaude() {
+async function setupClaude() {
   try {
     console.log('🚀 Setting up Linear MCP Server with Claude Desktop...\n');
     
     const configPath = getClaudeConfigPath();
     const serverPath = getServerPath();
     const apiKey = getLinearApiKey();
-    
+
     console.log(`📁 Config path: ${configPath}`);
     console.log(`🔧 Server path: ${serverPath}`);
     console.log(`🔑 API key: ${apiKey.substring(0, 10)}...`);
+
+    // Verify API key
+    const verification = await verifyApiKey(apiKey);
+    if (!verification.success) {
+      throw new Error(`API key verification failed: ${verification.error}\n\nPlease check that your Linear API key is valid and has the necessary permissions.\nGet a new key from: https://linear.app/settings/api`);
+    }
+
+    console.log(`✅ API key verified! Hello, ${verification.userName}!`);
+    console.log(`📊 Found ${verification.teamCount} team${verification.teamCount === 1 ? '' : 's'} in your workspace`);
     
     // Read or create config
     const config = readOrCreateConfig(configPath);
@@ -177,14 +232,50 @@ function setupClaude() {
     
     console.log('\n✅ Successfully configured Linear MCP Server with Claude Desktop!');
     console.log('\n📋 Next steps:');
-    console.log('1. Restart Claude Desktop application');
-    console.log('2. Look for Linear tools in the available tools list');
-    console.log('3. Try asking Claude: "Search for issues in Linear" or "Create a new issue"');
-    console.log('\n🔧 Tools available:');
+    console.log('1. Restart Claude Desktop application:');
+    if (isMacOS) {
+      console.log('   • Press Cmd+Q to quit Claude Desktop completely');
+      console.log('   • Reopen Claude Desktop from Applications');
+    } else if (isWindows) {
+      console.log('   • Right-click the Claude icon in system tray and select "Quit"');
+      console.log('   • Reopen Claude Desktop from Start menu');
+    } else {
+      console.log('   • Close Claude Desktop completely (not just minimize)');
+      console.log('   • Reopen Claude Desktop from your application launcher');
+    }
+    console.log('2. Look for Linear tools in the MCP tools panel');
+
+    // Show personalized examples based on user's teams
+    if (verification.teams && verification.teams.length > 0) {
+      console.log('\n💡 Try these personalized examples:');
+      const firstTeam = verification.teams[0];
+      console.log(`   • "Show me all issues in the ${firstTeam.name} team"`);
+      console.log(`   • "Create a new bug report in ${firstTeam.name}"`);
+      console.log('   • "What issues are assigned to me?"');
+      if (verification.teams.length > 1) {
+        const secondTeam = verification.teams[1];
+        console.log(`   • "Search for high-priority issues in ${secondTeam.name}"`);
+      }
+
+      console.log('\n📊 Your teams:');
+      verification.teams.forEach(team => {
+        console.log(`   • ${team.name} (${team.key}) - ID: ${team.id}`);
+      });
+    } else {
+      console.log('3. Try asking Claude: "Search for issues in Linear" or "Create a new issue"');
+    }
+
+    console.log('\n🔧 All 9 tools available:');
     console.log('   • search_issues - Search and filter Linear issues');
     console.log('   • create_issue - Create new issues in Linear');
+    console.log('   • update_issue - Modify existing issues (title, description, assignee, priority, state)');
+    console.log('   • get_issue - Retrieve a specific issue by ID');
+    console.log('   • get_my_issues - Get issues assigned to you');
     console.log('   • get_teams - List all teams in the workspace');
-    
+    console.log('   • get_workflow_states - List workflow states for a team');
+    console.log('   • add_comment - Add comments to issues');
+    console.log('   • health_check - Verify API connectivity');
+
     console.log(`\n📝 Configuration written to: ${configPath}`);
     
   } catch (error) {
@@ -199,4 +290,6 @@ function setupClaude() {
 }
 
 // Run setup
-setupClaude(); 
+(async () => {
+  await setupClaude();
+})(); 
