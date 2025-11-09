@@ -1,4 +1,4 @@
-import { LinearClient, Team, Issue, User } from '@linear/sdk';
+import { LinearClient, Team, Issue, User, WorkflowState, Comment } from '@linear/sdk';
 import pThrottle from 'p-throttle';
 import config from '../utils/config.js';
 import { logger } from '../utils/logger.js';
@@ -38,6 +38,96 @@ const throttle = pThrottle({
 });
 
 /**
+ * Retry configuration for network errors
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  backoffMultiplier: 2,
+};
+
+/**
+ * Cache entry with expiry time
+ */
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
+
+/**
+ * Execute an async function with exponential backoff retry logic
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  context: string,
+  retries = RETRY_CONFIG.maxRetries
+): Promise<T> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on non-network errors (4xx errors)
+      if (lastError.message.includes('404') || lastError.message.includes('400')) {
+        throw lastError;
+      }
+
+      // If we've exhausted retries, throw
+      if (attempt === retries) {
+        logger.error(`${context} failed after ${retries + 1} attempts`, { error: lastError });
+        throw lastError;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = Math.min(
+        RETRY_CONFIG.initialDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt),
+        RETRY_CONFIG.maxDelay
+      );
+
+      logger.warn(`${context} failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms`, {
+        error: lastError.message
+      });
+
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Helper to handle errors consistently across all methods
+ */
+function handleLinearError(error: unknown, context: string, params?: Record<string, any>): never {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorDetails = error instanceof Error ? { error } : undefined;
+
+  logger.error(context, errorDetails);
+
+  const paramString = params
+    ? Object.entries(params)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ')
+    : '';
+
+  const fullMessage = paramString
+    ? `${context} (${paramString}): ${errorMessage}`
+    : `${context}: ${errorMessage}`;
+
+  throw new AppError(
+    fullMessage,
+    500,
+    String(ErrorCode.InternalError),
+    error
+  );
+}
+
+/**
  * Service class for interacting with the Linear API
  *
  * This singleton service provides a rate-limited interface to the Linear API.
@@ -55,7 +145,12 @@ export class LinearService {
   private static instance: LinearService;
   private viewerCache?: User;
   private viewerCacheExpiry?: number;
+  private teamsCache?: CacheEntry<Team[]>;
+  private workflowStatesCache: Map<string, CacheEntry<WorkflowState[]>> = new Map();
+
   private static readonly VIEWER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private static readonly TEAMS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  private static readonly WORKFLOW_STATES_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
   private constructor() {
     this.client = new LinearClient({ apiKey: config.linearApiKey });
@@ -105,7 +200,8 @@ export class LinearService {
   /**
    * Get all teams from the Linear workspace
    *
-   * Rate limited to 10 requests per second. Results include team ID, name, key, and description.
+   * Rate limited to 10 requests per second. Results are cached for 10 minutes.
+   * Results include team ID, name, key, and description.
    *
    * @returns Promise resolving to array of teams
    * @throws {AppError} When API call fails
@@ -118,19 +214,33 @@ export class LinearService {
    */
   public async getTeams(): Promise<Team[]> {
     return throttle(async () => {
+      const now = Date.now();
+
+      // Return cached teams if still valid
+      if (this.teamsCache && now < this.teamsCache.expiry) {
+        logger.debug('Using cached teams');
+        return this.teamsCache.data;
+      }
+
       try {
         logger.debug('Fetching teams from Linear');
-        const teams = await this.client.teams();
-        return teams.nodes;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error('Failed to fetch teams from Linear', error instanceof Error ? { error } : undefined);
-        throw new AppError(
-          `Failed to fetch teams from Linear: ${errorMessage}`,
-          500,
-          String(ErrorCode.InternalError),
-          error
+        const teams = await withRetry(
+          async () => {
+            const result = await this.client.teams();
+            return result.nodes;
+          },
+          'Fetching teams from Linear'
         );
+
+        // Update cache
+        this.teamsCache = {
+          data: teams,
+          expiry: now + LinearService.TEAMS_CACHE_TTL
+        };
+
+        return teams;
+      } catch (error) {
+        handleLinearError(error, 'Failed to fetch teams from Linear');
       }
     })();
   }
@@ -198,21 +308,20 @@ export class LinearService {
 
       logger.debug('Using filter', { filter });
 
-      const issues = await this.client.issues({
-        first: cappedLimit,
-        filter: filter
-      });
-
-      return issues.nodes;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to search issues in Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to search issues in Linear (query: "${query}"): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
+      const issues = await withRetry(
+        async () => {
+          const result = await this.client.issues({
+            first: cappedLimit,
+            filter: filter
+          });
+          return result.nodes;
+        },
+        'Searching issues in Linear'
       );
+
+      return issues;
+    } catch (error) {
+      handleLinearError(error, 'Failed to search issues in Linear', { query });
     }
   }
 
@@ -267,23 +376,20 @@ export class LinearService {
         issueInput.assigneeId = assigneeId;
       }
 
-      const issuePayload = await this.client.createIssue(issueInput);
-      const issue = issuePayload.issue;
-
-      if (!issue) {
-        throw new AppError('Failed to create issue', 500, String(ErrorCode.InternalError));
-      }
+      const issue = await withRetry(
+        async () => {
+          const issuePayload = await this.client.createIssue(issueInput);
+          if (!issuePayload.issue) {
+            throw new AppError('Failed to create issue', 500, String(ErrorCode.InternalError));
+          }
+          return issuePayload.issue;
+        },
+        'Creating issue in Linear'
+      );
 
       return issue;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to create issue in Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to create issue in Linear (team: ${teamId}, title: "${title}"): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
-      );
+      handleLinearError(error, 'Failed to create issue in Linear', { teamId, title });
     }
   }
 
@@ -293,21 +399,18 @@ export class LinearService {
   public async getViewer(): Promise<User> {
     try {
       logger.debug('Fetching current user from Linear');
-      return await this.client.viewer;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to fetch current user from Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to fetch current user from Linear: ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
+      return await withRetry(
+        async () => this.client.viewer,
+        'Fetching current user from Linear'
       );
+    } catch (error) {
+      handleLinearError(error, 'Failed to fetch current user from Linear');
     }
   }
 
   /**
    * Health check - verify API connection and return status
+   * Rate limited to 10 requests per second.
    */
   public async healthCheck(): Promise<{
     status: 'healthy' | 'unhealthy';
@@ -316,32 +419,38 @@ export class LinearService {
     userName?: string;
     error?: string;
   }> {
-    try {
-      logger.debug('Performing health check');
-      const viewer = await this.client.viewer;
+    return throttle(async () => {
+      try {
+        logger.debug('Performing health check');
+        const viewer = await withRetry(
+          async () => this.client.viewer,
+          'Health check'
+        );
 
-      return {
-        status: 'healthy',
-        apiConnected: true,
-        userId: viewer.id,
-        userName: viewer.name
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Health check failed', error instanceof Error ? { error } : undefined);
+        return {
+          status: 'healthy' as const,
+          apiConnected: true,
+          userId: viewer.id,
+          userName: viewer.name
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Health check failed', error instanceof Error ? { error } : undefined);
 
-      return {
-        status: 'unhealthy',
-        apiConnected: false,
-        error: errorMessage
-      };
-    }
+        return {
+          status: 'unhealthy' as const,
+          apiConnected: false,
+          error: errorMessage
+        };
+      }
+    })();
   }
 
   /**
    * Get a specific issue by its ID
    *
    * Retrieves a single issue with all its details including state, assignee, team, and project.
+   * Rate limited to 10 requests per second.
    *
    * @param issueId - The Linear issue ID
    * @returns Promise resolving to the issue
@@ -354,36 +463,35 @@ export class LinearService {
    * ```
    */
   public async getIssue(issueId: string): Promise<Issue> {
-    try {
-      logger.debug('Fetching issue from Linear', { issueId });
-      const issue = await this.client.issue(issueId);
-
-      if (!issue) {
-        throw new AppError(
-          `Issue not found: ${issueId}`,
-          404,
-          String(ErrorCode.InvalidRequest)
+    return throttle(async () => {
+      try {
+        logger.debug('Fetching issue from Linear', { issueId });
+        const issue = await withRetry(
+          async () => this.client.issue(issueId),
+          'Fetching issue from Linear'
         );
-      }
 
-      return issue;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to fetch issue from Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to fetch issue from Linear (issueId: ${issueId}): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
-      );
-    }
+        if (!issue) {
+          throw new AppError(
+            `Issue not found: ${issueId}`,
+            404,
+            String(ErrorCode.InvalidRequest)
+          );
+        }
+
+        return issue;
+      } catch (error) {
+        handleLinearError(error, 'Failed to fetch issue from Linear', { issueId });
+      }
+    })();
   }
 
   /**
    * Get all workflow states for a specific team
    *
    * Returns all workflow states (statuses) configured for the team, including their type,
-   * position, and description.
+   * position, and description. Results are cached for 15 minutes per team.
+   * Rate limited to 10 requests per second.
    *
    * @param teamId - The team ID
    * @returns Promise resolving to array of workflow states
@@ -395,37 +503,53 @@ export class LinearService {
    * states.forEach(state => console.log(state.name, state.type));
    * ```
    */
-  public async getWorkflowStates(teamId: string): Promise<any[]> {
-    try {
-      logger.debug('Fetching workflow states from Linear', { teamId });
-      const team = await this.client.team(teamId);
+  public async getWorkflowStates(teamId: string): Promise<WorkflowState[]> {
+    return throttle(async () => {
+      const now = Date.now();
 
-      if (!team) {
-        throw new AppError(
-          `Team not found: ${teamId}`,
-          404,
-          String(ErrorCode.InvalidRequest)
-        );
+      // Check cache for this team
+      const cached = this.workflowStatesCache.get(teamId);
+      if (cached && now < cached.expiry) {
+        logger.debug('Using cached workflow states', { teamId });
+        return cached.data;
       }
 
-      const states = await team.states();
-      return states.nodes;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to fetch workflow states from Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to fetch workflow states from Linear (teamId: ${teamId}): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
-      );
-    }
+      try {
+        logger.debug('Fetching workflow states from Linear', { teamId });
+        const states = await withRetry(
+          async () => {
+            const team = await this.client.team(teamId);
+            if (!team) {
+              throw new AppError(
+                `Team not found: ${teamId}`,
+                404,
+                String(ErrorCode.InvalidRequest)
+              );
+            }
+            const result = await team.states();
+            return result.nodes;
+          },
+          'Fetching workflow states from Linear'
+        );
+
+        // Update cache for this team
+        this.workflowStatesCache.set(teamId, {
+          data: states,
+          expiry: now + LinearService.WORKFLOW_STATES_CACHE_TTL
+        });
+
+        return states;
+      } catch (error) {
+        handleLinearError(error, 'Failed to fetch workflow states from Linear', { teamId });
+      }
+    })();
   }
 
   /**
    * Add a comment to an existing issue
    *
    * Creates a new comment on the specified issue. The comment body supports markdown formatting.
+   * Rate limited to 10 requests per second.
    *
    * @param issueId - The issue ID to add the comment to
    * @param body - The comment text (supports markdown)
@@ -438,32 +562,32 @@ export class LinearService {
    * console.log(`Comment added: ${comment.id}`);
    * ```
    */
-  public async addComment(issueId: string, body: string): Promise<any> {
-    try {
-      logger.debug('Adding comment to issue in Linear', { issueId, bodyLength: body.length });
+  public async addComment(issueId: string, body: string): Promise<Comment> {
+    return throttle(async () => {
+      try {
+        logger.debug('Adding comment to issue in Linear', { issueId, bodyLength: body.length });
 
-      const commentPayload = await this.client.createComment({
-        issueId,
-        body
-      });
+        const comment = await withRetry(
+          async () => {
+            const commentPayload = await this.client.createComment({
+              issueId,
+              body
+            });
 
-      const comment = commentPayload.comment;
+            if (!commentPayload.comment) {
+              throw new AppError('Failed to create comment', 500, String(ErrorCode.InternalError));
+            }
 
-      if (!comment) {
-        throw new AppError('Failed to create comment', 500, String(ErrorCode.InternalError));
+            return commentPayload.comment;
+          },
+          'Adding comment to issue in Linear'
+        );
+
+        return comment;
+      } catch (error) {
+        handleLinearError(error, 'Failed to add comment to issue in Linear', { issueId });
       }
-
-      return comment;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to add comment to issue in Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to add comment to issue in Linear (issueId: ${issueId}): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
-      );
-    }
+    })();
   }
 
   /**
@@ -524,23 +648,20 @@ export class LinearService {
         issueInput.assigneeId = updates.assigneeId;
       }
 
-      const issuePayload = await this.client.updateIssue(issueId, issueInput);
-      const issue = issuePayload.issue;
-
-      if (!issue) {
-        throw new AppError('Failed to update issue', 500, String(ErrorCode.InternalError));
-      }
+      const issue = await withRetry(
+        async () => {
+          const issuePayload = await this.client.updateIssue(issueId, issueInput);
+          if (!issuePayload.issue) {
+            throw new AppError('Failed to update issue', 500, String(ErrorCode.InternalError));
+          }
+          return issuePayload.issue;
+        },
+        'Updating issue in Linear'
+      );
 
       return issue;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to update issue in Linear', error instanceof Error ? { error } : undefined);
-      throw new AppError(
-        `Failed to update issue in Linear (issueId: ${issueId}): ${errorMessage}`,
-        500,
-        String(ErrorCode.InternalError),
-        error
-      );
+      handleLinearError(error, 'Failed to update issue in Linear', { issueId });
     }
   }
 }

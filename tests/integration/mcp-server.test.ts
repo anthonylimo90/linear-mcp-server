@@ -198,8 +198,8 @@ describe('MCP Server Integration', () => {
       });
 
       it('should throw error when API returns no issue', async () => {
-        // Arrange
-        mockLinearClient.createIssue.mockResolvedValueOnce({ issue: null });
+        // Arrange - use mockResolvedValue to return null on all retry attempts
+        mockLinearClient.createIssue.mockResolvedValue({ issue: null });
 
         // Act & Assert
         await expect(
@@ -261,8 +261,8 @@ describe('MCP Server Integration', () => {
       });
 
       it('should throw error when API returns no issue', async () => {
-        // Arrange
-        mockLinearClient.updateIssue.mockResolvedValueOnce({ issue: null });
+        // Arrange - use mockResolvedValue to return null on all retry attempts
+        mockLinearClient.updateIssue.mockResolvedValue({ issue: null });
 
         // Act & Assert
         await expect(
@@ -347,16 +347,16 @@ describe('MCP Server Integration', () => {
     });
 
     it('should handle teams API errors gracefully', async () => {
-      // Arrange
-      mockLinearClient.teams.mockRejectedValueOnce(new Error('API Error'));
+      // Arrange - use mockRejectedValue to reject on all retry attempts
+      mockLinearClient.teams.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
       await expect(linearService.getTeams()).rejects.toThrow('Failed to fetch teams from Linear');
     });
 
     it('should handle issues search errors gracefully', async () => {
-      // Arrange
-      mockLinearClient.issues.mockRejectedValueOnce(new Error('Search Error'));
+      // Arrange - use mockRejectedValue to reject on all retry attempts
+      mockLinearClient.issues.mockRejectedValue(new Error('Search Error'));
 
       // Act & Assert
       await expect(
@@ -365,8 +365,8 @@ describe('MCP Server Integration', () => {
     });
 
     it('should handle create issue errors gracefully', async () => {
-      // Arrange
-      mockLinearClient.createIssue.mockRejectedValueOnce(new Error('Create Error'));
+      // Arrange - use mockRejectedValue to reject on all retry attempts
+      mockLinearClient.createIssue.mockRejectedValue(new Error('Create Error'));
 
       // Act & Assert
       await expect(
@@ -375,8 +375,8 @@ describe('MCP Server Integration', () => {
     });
 
     it('should handle update issue errors gracefully', async () => {
-      // Arrange
-      mockLinearClient.updateIssue.mockRejectedValueOnce(new Error('Update Error'));
+      // Arrange - use mockRejectedValue to reject on all retry attempts
+      mockLinearClient.updateIssue.mockRejectedValue(new Error('Update Error'));
 
       // Act & Assert
       await expect(
