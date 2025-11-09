@@ -182,7 +182,7 @@ async function setupClaude() {
 
     console.log(`📁 Config path: ${configPath}`);
     console.log(`🔧 Server path: ${serverPath}`);
-    console.log(`🔑 API key: ${apiKey.substring(0, 10)}...`);
+    console.log(`🔑 API key: ${apiKey.substring(0, 4)}${'*'.repeat(apiKey.length - 4)}`);
 
     // Verify API key
     const verification = await verifyApiKey(apiKey);
