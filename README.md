@@ -1,6 +1,61 @@
 # Linear MCP Server
 
-A [Model Context Protocol (MCP)](https://github.com/ModelContextProtocol/spec) server that provides tools for interacting with [Linear](https://linear.app) issue tracking system. This enables AI agents to search and create issues in Linear through a standardized interface.
+A [Model Context Protocol (MCP)](https://github.com/ModelContextProtocol/spec) server that enables AI agents like Claude to interact with [Linear](https://linear.app) issue tracking. Search, create, update issues, and more - all through natural language.
+
+---
+
+## ⚡ 30-Second Quick Start
+
+```bash
+git clone https://github.com/yourusername/linear-mcp-server.git
+cd linear-mcp-server
+npm install
+npm run setup:claude YOUR_LINEAR_API_KEY
+```
+
+**Done!** Restart Claude Desktop and start using Linear:
+- *"Show me all issues assigned to me"*
+- *"Create a bug report for the login page"*
+- *"What teams do I have access to?"*
+
+> Get your API key from [Linear Settings](https://linear.app/settings/api)
+
+---
+
+## What Can You Do?
+
+Once set up, you can ask Claude to:
+
+**📋 Search & Browse**
+- "Show me all high-priority bugs assigned to me"
+- "Find issues related to authentication in the Engineering team"
+- "What are my current tasks?"
+
+**✨ Create & Update**
+- "Create a new feature request for dark mode in the Design team"
+- "Update issue ENG-123 to high priority and assign it to me"
+- "Add a comment to issue PROJ-456 with a status update"
+
+**🔍 Get Information**
+- "What teams do I have in Linear?"
+- "Show me the workflow states for the Engineering team"
+- "Get the details of issue ENG-789"
+
+### All 9 Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `search_issues` | Search and filter Linear issues with powerful queries |
+| `create_issue` | Create new issues with priority, assignee, and more |
+| `update_issue` | Modify existing issues (title, description, assignee, priority, state) |
+| `get_issue` | Retrieve detailed information about a specific issue |
+| `get_my_issues` | Get all issues assigned to you |
+| `get_teams` | List all teams in your workspace |
+| `get_workflow_states` | View workflow states/statuses for a team |
+| `add_comment` | Add comments to issues (supports Markdown) |
+| `health_check` | Verify API connectivity and authentication |
+
+---
 
 ## Features
 
@@ -43,34 +98,6 @@ A [Model Context Protocol (MCP)](https://github.com/ModelContextProtocol/spec) s
 - ✅ **Testing**: 55 passing tests with 64.59% code coverage
 - ✅ **Error Context**: Detailed error messages with relevant parameters
 
-## Quick Start
-
-Get up and running with Claude Desktop in 3 simple steps:
-
-```bash
-# 1. Clone and build
-git clone https://github.com/yourusername/linear-mcp-server.git
-cd linear-mcp-server
-npm install && npm run build
-
-# 2. Get your Linear API key from https://linear.app/settings/api
-# Then run the setup script
-npm run setup:claude your_linear_api_key_here
-
-# 3. Restart Claude Desktop and start using Linear tools!
-```
-
-After setup, try asking Claude:
-- "Search for issues assigned to me in Linear"
-- "Create a new bug report in Linear"
-- "Update the description of issue ENG-123"
-- "Assign issue ENG-456 to me and set priority to high"
-- "Show me all teams in Linear"
-- "Get the details of issue ENG-789"
-- "What are the workflow states for the Engineering team?"
-- "Add a comment to issue ENG-123 saying 'Working on this now'"
-- "Check if Linear API is working"
-
 ## Architecture
 
 ```
@@ -86,19 +113,27 @@ src/
     └── linearService.ts  # Linear API service with rate limiting and caching
 ```
 
-## Installation
+## Installation & Setup
+
+### Automatic Setup (Recommended)
+
+The fastest way to get started with Claude Desktop:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/linear-mcp-server.git
-cd linear-mcp-server
-
-# Install dependencies
+# 1. Install dependencies and build
 npm install
 
-# Build the project
-npm run build
+# 2. Run setup with your Linear API key
+npm run setup:claude YOUR_LINEAR_API_KEY
+
+# 3. Restart Claude Desktop - you're done!
 ```
+
+The setup script will:
+- ✅ Build the project automatically if needed
+- ✅ Verify your API key works
+- ✅ Configure Claude Desktop for your OS
+- ✅ Show personalized examples using your teams
 
 ## Configuration
 
@@ -163,34 +198,11 @@ This server is designed to work with MCP-compatible clients. The server communic
 
 ## Client Integration
 
-### Claude Desktop Integration
+### Claude Desktop
 
-To use this server with Claude Desktop, you have two options:
+**Automatic Setup** (see Installation section above) is recommended.
 
-#### Option 1: Automatic Setup (Recommended)
-
-Use our setup script for easy configuration:
-
-```bash
-# Build the project first
-npm run build
-
-# Run the setup script
-npm run setup:claude
-
-# Or pass your API key directly
-npm run setup:claude your_linear_api_key_here
-```
-
-The script will automatically:
-- Detect your operating system
-- Find the Claude Desktop config file
-- Add the Linear MCP server configuration
-- Use your API key from `.env` or command line
-
-#### Option 2: Manual Setup
-
-Add it manually to your Claude configuration:
+**Manual Setup** - If you prefer to configure manually:
 
 #### macOS/Linux
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:

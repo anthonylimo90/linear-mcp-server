@@ -323,29 +323,29 @@ async function healthCheck(): Promise<HealthCheckResponse> {
 const tools = [
   {
     name: "search_issues",
-    description: "Search for issues in Linear",
+    description: "Search for issues in Linear with powerful filtering options. Examples: 'Find all high-priority bugs assigned to me', 'Show open issues in the Engineering team', 'Search for issues about authentication'",
     inputSchema: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description: "Search query"
+          description: "Search query - can be keywords, issue identifiers, or descriptions to search for"
         },
         teamId: {
           type: "string",
-          description: "Team ID to filter by"
+          description: "Team ID to filter results (use get_teams to find team IDs)"
         },
         status: {
           type: "string",
-          description: "Status to filter by"
+          description: "Status to filter by (e.g., 'In Progress', 'Done', 'Todo')"
         },
         assigneeId: {
           type: "string",
-          description: "Assignee ID to filter by. Use 'me' to filter by the current user."
+          description: "Assignee ID to filter by. Pro tip: Use 'me' to filter by the current user"
         },
         limit: {
           type: "number",
-          description: "Maximum number of issues to return"
+          description: "Maximum number of issues to return (default: 50)"
         }
       },
       required: ["query"]
@@ -353,29 +353,29 @@ const tools = [
   },
   {
     name: "create_issue",
-    description: "Create a new issue in Linear",
+    description: "Create a new issue in Linear with full customization. Examples: 'Create a bug report for login issues', 'Add a feature request to implement dark mode', 'Create a high-priority task and assign it to me'",
     inputSchema: {
       type: "object",
       properties: {
         teamId: {
           type: "string",
-          description: "Team ID"
+          description: "Team ID (use get_teams to find available teams)"
         },
         title: {
           type: "string",
-          description: "Issue title"
+          description: "Issue title - should be clear and concise"
         },
         description: {
           type: "string",
-          description: "Issue description"
+          description: "Detailed issue description (supports Markdown formatting)"
         },
         assigneeId: {
           type: "string",
-          description: "Assignee ID. Use 'me' to assign to the current user."
+          description: "Assignee ID. Pro tip: Use 'me' to assign to yourself"
         },
         priority: {
           type: "number",
-          description: "Issue priority (0-4)"
+          description: "Issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent"
         }
       },
       required: ["teamId", "title"]
@@ -383,13 +383,13 @@ const tools = [
   },
   {
     name: "update_issue",
-    description: "Update an existing issue in Linear",
+    description: "Update an existing issue in Linear - modify title, description, assignee, priority, or workflow state. Examples: 'Update issue ENG-123 to high priority', 'Assign issue ENG-456 to me', 'Change the description of issue ENG-789'",
     inputSchema: {
       type: "object",
       properties: {
         issueId: {
           type: "string",
-          description: "Issue ID to update"
+          description: "Issue ID to update (the unique identifier like 'ENG-123')"
         },
         title: {
           type: "string",
@@ -397,19 +397,19 @@ const tools = [
         },
         description: {
           type: "string",
-          description: "New issue description"
+          description: "New issue description (supports Markdown formatting)"
         },
         assigneeId: {
           type: "string",
-          description: "New assignee ID. Use 'me' to assign to current user, empty string to unassign."
+          description: "New assignee ID. Pro tip: Use 'me' to assign to yourself, or empty string '' to unassign"
         },
         priority: {
           type: "number",
-          description: "New issue priority (0-4)"
+          description: "New issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent"
         },
         stateId: {
           type: "string",
-          description: "New workflow state ID"
+          description: "New workflow state ID (use get_workflow_states to find state IDs)"
         }
       },
       required: ["issueId"]
@@ -417,7 +417,7 @@ const tools = [
   },
   {
     name: "get_teams",
-    description: "Get all teams in the workspace",
+    description: "Get all teams in your Linear workspace. Use this to find team IDs for creating issues or filtering searches. Example: 'Show me all my Linear teams'",
     inputSchema: {
       type: "object",
       properties: {}
@@ -425,26 +425,26 @@ const tools = [
   },
   {
     name: "get_my_issues",
-    description: "Get issues assigned to the current user in Linear",
+    description: "Get all issues assigned to you in Linear. Perfect for daily standup prep or checking your current workload. Examples: 'What issues are assigned to me?', 'Show my current tasks'",
     inputSchema: {
       type: "object",
       properties: {
         limit: {
           type: "number",
-          description: "Maximum number of issues to return"
+          description: "Maximum number of issues to return (default: 50, max: 250)"
         }
       }
     }
   },
   {
     name: "get_issue",
-    description: "Get a specific issue by ID from Linear",
+    description: "Get detailed information about a specific issue by its ID. Examples: 'Get the details of issue ENG-123', 'Show me issue PROJ-456'",
     inputSchema: {
       type: "object",
       properties: {
         issueId: {
           type: "string",
-          description: "The ID of the issue to retrieve"
+          description: "The unique ID of the issue to retrieve (e.g., 'abc123-def456-...'). Note: This is the internal UUID, not the identifier like 'ENG-123'"
         }
       },
       required: ["issueId"]
@@ -452,13 +452,13 @@ const tools = [
   },
   {
     name: "get_workflow_states",
-    description: "Get all workflow states for a team in Linear",
+    description: "Get all workflow states (statuses) for a specific team. Use this to find state IDs when updating issues. Examples: 'Show workflow states for the Engineering team', 'What statuses are available?'",
     inputSchema: {
       type: "object",
       properties: {
         teamId: {
           type: "string",
-          description: "The ID of the team"
+          description: "The ID of the team (use get_teams to find team IDs)"
         }
       },
       required: ["teamId"]
@@ -466,7 +466,7 @@ const tools = [
   },
   {
     name: "add_comment",
-    description: "Add a comment to an issue in Linear",
+    description: "Add a comment to an existing issue in Linear. Comments support Markdown formatting. Examples: 'Add a comment to issue ENG-123', 'Comment on the bug report with an update'",
     inputSchema: {
       type: "object",
       properties: {
@@ -476,7 +476,7 @@ const tools = [
         },
         body: {
           type: "string",
-          description: "The comment text"
+          description: "The comment text (supports Markdown formatting for rich text)"
         }
       },
       required: ["issueId", "body"]
@@ -484,7 +484,7 @@ const tools = [
   },
   {
     name: "health_check",
-    description: "Check the health and connectivity of the Linear API",
+    description: "Verify that the Linear API connection is working and check authentication status. Use this to troubleshoot connection issues. Example: 'Check if Linear API is working'",
     inputSchema: {
       type: "object",
       properties: {}
