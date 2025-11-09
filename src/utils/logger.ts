@@ -1,4 +1,4 @@
-import { pino } from 'pino';
+import pino from 'pino';
 import type { Logger as PinoLogger } from 'pino';
 import { AppError, handleError, type ErrorResponse } from './error.js';
 

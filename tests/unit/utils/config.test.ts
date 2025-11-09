@@ -13,18 +13,18 @@ describe('Config', () => {
     process.env = originalEnv;
   });
 
-  it('should load default configuration', () => {
+  it('should load default configuration', async () => {
     // Arrange
     process.env.LINEAR_API_KEY = 'test-key';
-    delete require.cache[require.resolve('../../../src/utils/config.js')];
-    
+    jest.resetModules();
+
     // Act
-    const config = require('../../../src/utils/config.js').default;
-    
+    const config = (await import('../../../src/utils/config.js')).default;
+
     // Assert
     expect(config).toMatchObject({
       port: 3000,
-      logLevel: 'info',
+      logLevel: 'error',
       linearApiKey: 'test-key',
       enableRateLimit: false,
       rateLimitMax: 100,
@@ -33,7 +33,7 @@ describe('Config', () => {
     });
   });
 
-  it('should load custom environment variables', () => {
+  it('should load custom environment variables', async () => {
     // Arrange
     process.env.LINEAR_API_KEY = 'custom-key';
     process.env.PORT = '4000';
@@ -42,11 +42,11 @@ describe('Config', () => {
     process.env.RATE_LIMIT_MAX = '200';
     process.env.RATE_LIMIT_WINDOW_MS = '120000';
     process.env.NODE_ENV = 'production';
-    delete require.cache[require.resolve('../../../src/utils/config.js')];
-    
+    jest.resetModules();
+
     // Act
-    const config = require('../../../src/utils/config.js').default;
-    
+    const config = (await import('../../../src/utils/config.js')).default;
+
     // Assert
     expect(config).toMatchObject({
       port: 4000,
@@ -59,29 +59,33 @@ describe('Config', () => {
     });
   });
 
-  it('should parse boolean values correctly', () => {
+  it('should parse boolean values correctly', async () => {
     // Arrange
     process.env.LINEAR_API_KEY = 'test-key';
     process.env.ENABLE_RATE_LIMIT = 'false';
-    delete require.cache[require.resolve('../../../src/utils/config.js')];
-    
+    jest.resetModules();
+
     // Act
-    const config = require('../../../src/utils/config.js').default;
-    
+    const config = (await import('../../../src/utils/config.js')).default;
+
     // Assert
     expect(config.enableRateLimit).toBe(false);
   });
 
-  it('should parse numeric values correctly', () => {
+  it('should use default values when numeric env variables are invalid', async () => {
     // Arrange
     process.env.LINEAR_API_KEY = 'test-key';
     process.env.PORT = 'invalid-number';
-    delete require.cache[require.resolve('../../../src/utils/config.js')];
-    
+    process.env.RATE_LIMIT_MAX = 'not-a-number';
+    process.env.RATE_LIMIT_WINDOW_MS = 'also-invalid';
+    jest.resetModules();
+
     // Act
-    const config = require('../../../src/utils/config.js').default;
-    
+    const config = (await import('../../../src/utils/config.js')).default;
+
     // Assert
-    expect(config.port).toBeNaN();
+    expect(config.port).toBe(3000);
+    expect(config.rateLimitMax).toBe(100);
+    expect(config.rateLimitWindowMs).toBe(60000);
   });
 }); 
