@@ -30,7 +30,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
   },
   "dependencies": {
-    "@linear/sdk": "^40.0.0",
+    "@linear/sdk": "^64.0.0",
     "@modelcontextprotocol/sdk": "^1.11.4",
     "dotenv": "^16.5.0",
     "p-throttle": "^8.1.0",
