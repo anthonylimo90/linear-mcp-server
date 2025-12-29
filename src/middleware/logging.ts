@@ -20,7 +20,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   // Override the send function to log the response
   res.send = function (body) {
     const responseTime = Date.now() - start;
-    
+
     // Log the response
     logger.info('Response sent', {
       statusCode: res.statusCode,
@@ -28,10 +28,9 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
       url,
       method,
       // Only log response body for errors in production, or all responses in development
-      ...(process.env.NODE_ENV === 'development' || res.statusCode >= 400 
-        ? { response: JSON.parse(JSON.stringify(body)) } 
-        : {}
-      ),
+      ...(process.env.NODE_ENV === 'development' || res.statusCode >= 400
+        ? { response: JSON.parse(JSON.stringify(body)) }
+        : {}),
     });
 
     // Call the original send function
@@ -41,12 +40,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   next();
 };
 
-export const errorLogger = (
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const errorLogger = (err: Error, req: Request, res: Response, next: NextFunction) => {
   logger.error('Unhandled error', {
     error: {
       name: err.name,

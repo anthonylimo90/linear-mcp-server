@@ -88,9 +88,12 @@ async function withRetry<T>(
         RETRY_CONFIG.maxDelay
       );
 
-      logger.warn(`${context} failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms`, {
-        error: lastError.message
-      });
+      logger.warn(
+        `${context} failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms`,
+        {
+          error: lastError.message,
+        }
+      );
 
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -119,12 +122,7 @@ function handleLinearError(error: unknown, context: string, params?: Record<stri
     ? `${context} (${paramString}): ${errorMessage}`
     : `${context}: ${errorMessage}`;
 
-  throw new AppError(
-    fullMessage,
-    500,
-    String(ErrorCode.InternalError),
-    error
-  );
+  throw new AppError(fullMessage, 500, String(ErrorCode.InternalError), error);
 }
 
 /**
@@ -224,18 +222,15 @@ export class LinearService {
 
       try {
         logger.debug('Fetching teams from Linear');
-        const teams = await withRetry(
-          async () => {
-            const result = await this.client.teams();
-            return result.nodes;
-          },
-          'Fetching teams from Linear'
-        );
+        const teams = await withRetry(async () => {
+          const result = await this.client.teams();
+          return result.nodes;
+        }, 'Fetching teams from Linear');
 
         // Update cache
         this.teamsCache = {
           data: teams,
-          expiry: now + LinearService.TEAMS_CACHE_TTL
+          expiry: now + LinearService.TEAMS_CACHE_TTL,
         };
 
         return teams;
@@ -279,7 +274,13 @@ export class LinearService {
       // Cap the limit at 250 for performance reasons
       const cappedLimit = Math.min(limit, 250);
 
-      logger.debug('Searching issues in Linear', { query, teamId, status, assigneeId, limit: cappedLimit });
+      logger.debug('Searching issues in Linear', {
+        query,
+        teamId,
+        status,
+        assigneeId,
+        limit: cappedLimit,
+      });
 
       // Build filter object using proper Linear API structure
       const filter: IssueFilter = {};
@@ -308,16 +309,13 @@ export class LinearService {
 
       logger.debug('Using filter', { filter });
 
-      const issues = await withRetry(
-        async () => {
-          const result = await this.client.issues({
-            first: cappedLimit,
-            filter: filter
-          });
-          return result.nodes;
-        },
-        'Searching issues in Linear'
-      );
+      const issues = await withRetry(async () => {
+        const result = await this.client.issues({
+          first: cappedLimit,
+          filter: filter,
+        });
+        return result.nodes;
+      }, 'Searching issues in Linear');
 
       return issues;
     } catch (error) {
@@ -359,33 +357,36 @@ export class LinearService {
     priority?: number
   ): Promise<Issue> {
     try {
-      logger.debug('Creating issue in Linear', { teamId, title, description, assigneeId, priority });
+      logger.debug('Creating issue in Linear', {
+        teamId,
+        title,
+        description,
+        assigneeId,
+        priority,
+      });
 
       const issueInput: IssueCreateInput = {
         teamId,
-        title
+        title,
       };
 
       if (description) issueInput.description = description;
       if (priority !== undefined) issueInput.priority = priority;
 
-      if (assigneeId === "me") {
+      if (assigneeId === 'me') {
         const viewer = await this.getCachedViewer();
         issueInput.assigneeId = viewer.id;
       } else if (assigneeId) {
         issueInput.assigneeId = assigneeId;
       }
 
-      const issue = await withRetry(
-        async () => {
-          const issuePayload = await this.client.createIssue(issueInput);
-          if (!issuePayload.issue) {
-            throw new AppError('Failed to create issue', 500, String(ErrorCode.InternalError));
-          }
-          return issuePayload.issue;
-        },
-        'Creating issue in Linear'
-      );
+      const issue = await withRetry(async () => {
+        const issuePayload = await this.client.createIssue(issueInput);
+        if (!issuePayload.issue) {
+          throw new AppError('Failed to create issue', 500, String(ErrorCode.InternalError));
+        }
+        return issuePayload.issue;
+      }, 'Creating issue in Linear');
 
       return issue;
     } catch (error) {
@@ -399,10 +400,7 @@ export class LinearService {
   public async getViewer(): Promise<User> {
     try {
       logger.debug('Fetching current user from Linear');
-      return await withRetry(
-        async () => this.client.viewer,
-        'Fetching current user from Linear'
-      );
+      return await withRetry(async () => this.client.viewer, 'Fetching current user from Linear');
     } catch (error) {
       handleLinearError(error, 'Failed to fetch current user from Linear');
     }
@@ -422,16 +420,13 @@ export class LinearService {
     return throttle(async () => {
       try {
         logger.debug('Performing health check');
-        const viewer = await withRetry(
-          async () => this.client.viewer,
-          'Health check'
-        );
+        const viewer = await withRetry(async () => this.client.viewer, 'Health check');
 
         return {
           status: 'healthy' as const,
           apiConnected: true,
           userId: viewer.id,
-          userName: viewer.name
+          userName: viewer.name,
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -440,7 +435,7 @@ export class LinearService {
         return {
           status: 'unhealthy' as const,
           apiConnected: false,
-          error: errorMessage
+          error: errorMessage,
         };
       }
     })();
@@ -472,11 +467,7 @@ export class LinearService {
         );
 
         if (!issue) {
-          throw new AppError(
-            `Issue not found: ${issueId}`,
-            404,
-            String(ErrorCode.InvalidRequest)
-          );
+          throw new AppError(`Issue not found: ${issueId}`, 404, String(ErrorCode.InvalidRequest));
         }
 
         return issue;
@@ -516,26 +507,19 @@ export class LinearService {
 
       try {
         logger.debug('Fetching workflow states from Linear', { teamId });
-        const states = await withRetry(
-          async () => {
-            const team = await this.client.team(teamId);
-            if (!team) {
-              throw new AppError(
-                `Team not found: ${teamId}`,
-                404,
-                String(ErrorCode.InvalidRequest)
-              );
-            }
-            const result = await team.states();
-            return result.nodes;
-          },
-          'Fetching workflow states from Linear'
-        );
+        const states = await withRetry(async () => {
+          const team = await this.client.team(teamId);
+          if (!team) {
+            throw new AppError(`Team not found: ${teamId}`, 404, String(ErrorCode.InvalidRequest));
+          }
+          const result = await team.states();
+          return result.nodes;
+        }, 'Fetching workflow states from Linear');
 
         // Update cache for this team
         this.workflowStatesCache.set(teamId, {
           data: states,
-          expiry: now + LinearService.WORKFLOW_STATES_CACHE_TTL
+          expiry: now + LinearService.WORKFLOW_STATES_CACHE_TTL,
         });
 
         return states;
@@ -567,21 +551,18 @@ export class LinearService {
       try {
         logger.debug('Adding comment to issue in Linear', { issueId, bodyLength: body.length });
 
-        const comment = await withRetry(
-          async () => {
-            const commentPayload = await this.client.createComment({
-              issueId,
-              body
-            });
+        const comment = await withRetry(async () => {
+          const commentPayload = await this.client.createComment({
+            issueId,
+            body,
+          });
 
-            if (!commentPayload.comment) {
-              throw new AppError('Failed to create comment', 500, String(ErrorCode.InternalError));
-            }
+          if (!commentPayload.comment) {
+            throw new AppError('Failed to create comment', 500, String(ErrorCode.InternalError));
+          }
 
-            return commentPayload.comment;
-          },
-          'Adding comment to issue in Linear'
-        );
+          return commentPayload.comment;
+        }, 'Adding comment to issue in Linear');
 
         return comment;
       } catch (error) {
@@ -639,25 +620,22 @@ export class LinearService {
       if (updates.priority !== undefined) issueInput.priority = updates.priority;
       if (updates.stateId) issueInput.stateId = updates.stateId;
 
-      if (updates.assigneeId === "me") {
+      if (updates.assigneeId === 'me') {
         const viewer = await this.getCachedViewer();
         issueInput.assigneeId = viewer.id;
-      } else if (updates.assigneeId === null || updates.assigneeId === "") {
+      } else if (updates.assigneeId === null || updates.assigneeId === '') {
         issueInput.assigneeId = null; // Unassign
       } else if (updates.assigneeId) {
         issueInput.assigneeId = updates.assigneeId;
       }
 
-      const issue = await withRetry(
-        async () => {
-          const issuePayload = await this.client.updateIssue(issueId, issueInput);
-          if (!issuePayload.issue) {
-            throw new AppError('Failed to update issue', 500, String(ErrorCode.InternalError));
-          }
-          return issuePayload.issue;
-        },
-        'Updating issue in Linear'
-      );
+      const issue = await withRetry(async () => {
+        const issuePayload = await this.client.updateIssue(issueId, issueInput);
+        if (!issuePayload.issue) {
+          throw new AppError('Failed to update issue', 500, String(ErrorCode.InternalError));
+        }
+        return issuePayload.issue;
+      }, 'Updating issue in Linear');
 
       return issue;
     } catch (error) {
@@ -667,4 +645,4 @@ export class LinearService {
 }
 
 // Export singleton instance
-export const linearService = LinearService.getInstance(); 
+export const linearService = LinearService.getInstance();

@@ -22,7 +22,7 @@ const SENSITIVE_FIELDS = [
   'private_key',
   'authorization',
   'cookie',
-  'session'
+  'session',
 ];
 
 /**
@@ -42,15 +42,14 @@ function redactSensitiveData(data: any): any {
   const redacted: any = {};
   for (const [key, value] of Object.entries(data)) {
     const lowerKey = key.toLowerCase();
-    const isSensitive = SENSITIVE_FIELDS.some(field =>
-      lowerKey.includes(field.toLowerCase())
-    );
+    const isSensitive = SENSITIVE_FIELDS.some(field => lowerKey.includes(field.toLowerCase()));
 
     if (isSensitive && typeof value === 'string') {
       // Show first 4 characters, redact the rest
-      redacted[key] = value.length > 4
-        ? `${value.substring(0, 4)}${'*'.repeat(Math.min(value.length - 4, 20))}`
-        : '****';
+      redacted[key] =
+        value.length > 4
+          ? `${value.substring(0, 4)}${'*'.repeat(Math.min(value.length - 4, 20))}`
+          : '****';
     } else if (typeof value === 'object' && value !== null) {
       redacted[key] = redactSensitiveData(value);
     } else {
@@ -134,8 +133,8 @@ export class Logger {
           statusCode: errorResponse.statusCode,
           code: errorResponse.code,
           stack: message.stack,
-          details: errorResponse.details
-        }
+          details: errorResponse.details,
+        },
       };
       this.logger.error(redactSensitiveData(logData), message.message);
     } else {

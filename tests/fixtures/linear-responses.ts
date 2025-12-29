@@ -1,4 +1,4 @@
-import type { Issue, Team } from '../../src/types.js';
+import type { Issue } from '../../src/types.js';
 
 // Mock Linear SDK responses
 export const mockLinearTeams = [
@@ -27,11 +27,11 @@ export const mockLinearIssues = [
     state: Promise.resolve({ id: 'state-1', name: 'In Progress' }),
     assignee: Promise.resolve({ id: 'user-1', name: 'John Doe' }),
     team: Promise.resolve({ id: 'team-1', name: 'Engineering', key: 'ENG' }),
-    project: Promise.resolve({ 
-      id: 'project-1', 
-      name: 'Core Platform', 
+    project: Promise.resolve({
+      id: 'project-1',
+      name: 'Core Platform',
       url: 'https://linear.app/project/project-1',
-      state: 'Active'
+      state: 'Active',
     }),
   },
   {
@@ -107,4 +107,4 @@ export const mockUpdatedIssue = {
   title: 'Updated issue title',
   url: 'https://linear.app/team/issue/ENG-123',
   state: Promise.resolve({ id: 'state-3', name: 'Done' }),
-}; 
+};

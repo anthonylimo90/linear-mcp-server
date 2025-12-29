@@ -9,7 +9,12 @@ export class AppError extends Error {
   code: string;
   details?: unknown;
 
-  constructor(message: string, statusCode = 500, code: string = String(ErrorCode.InternalError), details?: unknown) {
+  constructor(
+    message: string,
+    statusCode = 500,
+    code: string = String(ErrorCode.InternalError),
+    details?: unknown
+  ) {
     super(message);
     this.name = 'AppError';
     this.statusCode = statusCode;
@@ -38,7 +43,7 @@ export function handleError(error: unknown): ErrorResponse {
       statusCode: error.statusCode,
       code: error.code,
       message: error.message,
-      details: error.details
+      details: error.details,
     };
   }
 
@@ -47,7 +52,7 @@ export function handleError(error: unknown): ErrorResponse {
     return {
       statusCode: 500,
       code: String(ErrorCode.InternalError),
-      message: error.message
+      message: error.message,
     };
   }
 
@@ -55,6 +60,6 @@ export function handleError(error: unknown): ErrorResponse {
   return {
     statusCode: 500,
     code: String(ErrorCode.InternalError),
-    message: typeof error === 'string' ? error : 'An unknown error occurred'
+    message: typeof error === 'string' ? error : 'An unknown error occurred',
   };
-} 
+}

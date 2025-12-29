@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
 describe('Config', () => {
   let originalEnv: NodeJS.ProcessEnv;
-  
+
   beforeEach(() => {
     // Save original environment
     originalEnv = { ...process.env };
   });
-  
+
   afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
@@ -88,4 +88,4 @@ describe('Config', () => {
     expect(config.rateLimitMax).toBe(100);
     expect(config.rateLimitWindowMs).toBe(60000);
   });
-}); 
+});

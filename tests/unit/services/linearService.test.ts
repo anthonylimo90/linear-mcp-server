@@ -65,7 +65,8 @@ describe('LinearService', () => {
 
       // Act & Assert
       await expect(service.getTeams()).rejects.toThrow('Failed to fetch teams from Linear');
-      expect(mockLinearClient.teams).toHaveBeenCalledTimes(1);
+      // Expects 4 calls: initial + 3 retries (RETRY_CONFIG.maxRetries = 3)
+      expect(mockLinearClient.teams).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -85,7 +86,13 @@ describe('LinearService', () => {
       mockLinearClient.issues.mockResolvedValue({ nodes: mockIssues });
 
       // Act
-      const result = await service.searchIssues('test query', 'team-1', 'In Progress', 'user-1', 10);
+      const result = await service.searchIssues(
+        'test query',
+        'team-1',
+        'In Progress',
+        'user-1',
+        10
+      );
 
       // Assert
       expect(result).toEqual(mockIssues);
@@ -216,9 +223,9 @@ describe('LinearService', () => {
       mockLinearClient.createIssue.mockResolvedValue({ issue: null });
 
       // Act & Assert
-      await expect(
-        service.createIssue('team-1', 'Test Issue')
-      ).rejects.toThrow('Failed to create issue');
+      await expect(service.createIssue('team-1', 'Test Issue')).rejects.toThrow(
+        'Failed to create issue'
+      );
     });
 
     it('should handle API errors', async () => {
@@ -226,9 +233,9 @@ describe('LinearService', () => {
       mockLinearClient.createIssue.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
-      await expect(
-        service.createIssue('team-1', 'Test Issue')
-      ).rejects.toThrow('Failed to create issue in Linear');
+      await expect(service.createIssue('team-1', 'Test Issue')).rejects.toThrow(
+        'Failed to create issue in Linear'
+      );
     });
   });
 
@@ -292,9 +299,9 @@ describe('LinearService', () => {
       mockLinearClient.updateIssue.mockResolvedValue({ issue: null });
 
       // Act & Assert
-      await expect(
-        service.updateIssue('issue-1', { title: 'Test' })
-      ).rejects.toThrow('Failed to update issue');
+      await expect(service.updateIssue('issue-1', { title: 'Test' })).rejects.toThrow(
+        'Failed to update issue'
+      );
     });
 
     it('should handle API errors', async () => {
@@ -302,9 +309,9 @@ describe('LinearService', () => {
       mockLinearClient.updateIssue.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
-      await expect(
-        service.updateIssue('issue-1', { title: 'Test' })
-      ).rejects.toThrow('Failed to update issue in Linear');
+      await expect(service.updateIssue('issue-1', { title: 'Test' })).rejects.toThrow(
+        'Failed to update issue in Linear'
+      );
     });
   });
 
@@ -351,7 +358,9 @@ describe('LinearService', () => {
       mockLinearClient.issue.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
-      await expect(service.getIssue('issue-1')).rejects.toThrow('Failed to fetch issue from Linear');
+      await expect(service.getIssue('issue-1')).rejects.toThrow(
+        'Failed to fetch issue from Linear'
+      );
     });
   });
 
@@ -363,10 +372,12 @@ describe('LinearService', () => {
         { id: 'state-2', name: 'In Progress', type: 'started' },
         { id: 'state-3', name: 'Done', type: 'completed' },
       ];
-      const mockTeam: any = {
+      const statesMethod: any = jest.fn();
+      statesMethod.mockResolvedValue({ nodes: mockStates });
+      const mockTeam = {
         id: 'team-1',
         name: 'Engineering',
-        states: jest.fn().mockResolvedValue({ nodes: mockStates }),
+        states: statesMethod,
       };
       mockLinearClient.team.mockResolvedValue(mockTeam);
 
@@ -382,9 +393,11 @@ describe('LinearService', () => {
     it('should cache workflow states for 15 minutes', async () => {
       // Arrange
       const mockStates = [{ id: 'state-1', name: 'Todo', type: 'backlog' }];
-      const mockTeam: any = {
+      const statesMethod: any = jest.fn();
+      statesMethod.mockResolvedValue({ nodes: mockStates });
+      const mockTeam = {
         id: 'team-1',
-        states: jest.fn().mockResolvedValue({ nodes: mockStates }),
+        states: statesMethod,
       };
       mockLinearClient.team.mockResolvedValue(mockTeam);
 
@@ -411,7 +424,9 @@ describe('LinearService', () => {
       mockLinearClient.team.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
-      await expect(service.getWorkflowStates('team-1')).rejects.toThrow('Failed to fetch workflow states from Linear');
+      await expect(service.getWorkflowStates('team-1')).rejects.toThrow(
+        'Failed to fetch workflow states from Linear'
+      );
     });
   });
 
@@ -441,9 +456,9 @@ describe('LinearService', () => {
       mockLinearClient.createComment.mockResolvedValue({ comment: null });
 
       // Act & Assert
-      await expect(
-        service.addComment('issue-1', 'Test comment')
-      ).rejects.toThrow('Failed to create comment');
+      await expect(service.addComment('issue-1', 'Test comment')).rejects.toThrow(
+        'Failed to create comment'
+      );
     });
 
     it('should handle API errors', async () => {
@@ -451,9 +466,9 @@ describe('LinearService', () => {
       mockLinearClient.createComment.mockRejectedValue(new Error('API Error'));
 
       // Act & Assert
-      await expect(
-        service.addComment('issue-1', 'Test comment')
-      ).rejects.toThrow('Failed to add comment to issue in Linear');
+      await expect(service.addComment('issue-1', 'Test comment')).rejects.toThrow(
+        'Failed to add comment to issue in Linear'
+      );
     });
   });
 

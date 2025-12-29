@@ -80,4 +80,4 @@ describe('Simple Tests', () => {
       expect(process.env.LOG_LEVEL).toBe('error');
     });
   });
-}); 
+});

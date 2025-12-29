@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { requestLogger, errorLogger } from '../../../src/middleware/logging.js';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 
 describe('Logging middleware', () => {
   let mockRequest: Partial<Request>;
@@ -28,11 +28,7 @@ describe('Logging middleware', () => {
   describe('requestLogger', () => {
     it('should log incoming request', () => {
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -44,11 +40,7 @@ describe('Logging middleware', () => {
       mockResponse.send = originalSend;
 
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockResponse.send).not.toBe(originalSend);
@@ -61,11 +53,7 @@ describe('Logging middleware', () => {
       mockResponse.send = originalSend;
 
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       const responseBody = { result: 'success' };
       mockResponse.send!(responseBody as any);
@@ -80,11 +68,7 @@ describe('Logging middleware', () => {
       mockRequest.body = { test: 'should not be logged' };
 
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalled();
@@ -95,11 +79,7 @@ describe('Logging middleware', () => {
       mockRequest.query = { search: 'test', limit: '10' };
 
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalled();
@@ -110,11 +90,7 @@ describe('Logging middleware', () => {
       mockRequest.params = { id: '123', action: 'update' };
 
       // Act
-      requestLogger(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalled();
@@ -128,12 +104,7 @@ describe('Logging middleware', () => {
       error.stack = 'Error stack trace';
 
       // Act
-      errorLogger(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      errorLogger(error, mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalledWith(error);
@@ -149,12 +120,7 @@ describe('Logging middleware', () => {
       mockRequest.body = { data: 'test' };
 
       // Act
-      errorLogger(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      errorLogger(error, mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalledWith(error);
@@ -166,12 +132,7 @@ describe('Logging middleware', () => {
       delete error.stack;
 
       // Act
-      errorLogger(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      errorLogger(error, mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalledWith(error);
@@ -185,12 +146,7 @@ describe('Logging middleware', () => {
       error.stack = 'This should not be logged in production';
 
       // Act
-      errorLogger(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      errorLogger(error, mockRequest as Request, mockResponse as Response, mockNext);
 
       // Assert
       expect(mockNext).toHaveBeenCalledWith(error);

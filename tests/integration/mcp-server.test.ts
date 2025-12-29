@@ -23,9 +23,7 @@ describe('MCP Server Integration', () => {
 
     // Setup mock Linear client with realistic responses
     const teamsResponse = {
-      nodes: [
-        { id: 'team-1', name: 'Engineering', key: 'ENG', description: 'Engineering team' }
-      ]
+      nodes: [{ id: 'team-1', name: 'Engineering', key: 'ENG', description: 'Engineering team' }],
     };
 
     const issuesResponse = {
@@ -41,8 +39,8 @@ describe('MCP Server Integration', () => {
           assignee: Promise.resolve({ name: 'John Doe' }),
           team: Promise.resolve({ id: 'team-1', name: 'Engineering', key: 'ENG' }),
           project: Promise.resolve(null),
-        }
-      ]
+        },
+      ],
     };
 
     const createResponse = {
@@ -51,7 +49,7 @@ describe('MCP Server Integration', () => {
         identifier: 'ENG-999',
         title: 'New issue',
         url: 'https://linear.app/issue/ENG-999',
-      }
+      },
     };
 
     const updateResponse = {
@@ -61,7 +59,7 @@ describe('MCP Server Integration', () => {
         title: 'Updated issue',
         url: 'https://linear.app/issue/ENG-123',
         state: Promise.resolve({ name: 'Done' }),
-      }
+      },
     };
 
     mockLinearClient = {
@@ -91,7 +89,13 @@ describe('MCP Server Integration', () => {
     describe('search_issues', () => {
       it('should search and return issues with all filters', async () => {
         // Act
-        const issues = await linearService.searchIssues('test', 'team-1', 'In Progress', 'user-1', 10);
+        const issues = await linearService.searchIssues(
+          'test',
+          'team-1',
+          'In Progress',
+          'user-1',
+          10
+        );
 
         // Assert
         expect(issues).toHaveLength(1);
@@ -202,9 +206,9 @@ describe('MCP Server Integration', () => {
         mockLinearClient.createIssue.mockResolvedValue({ issue: null });
 
         // Act & Assert
-        await expect(
-          linearService.createIssue('team-1', 'Test')
-        ).rejects.toThrow('Failed to create issue');
+        await expect(linearService.createIssue('team-1', 'Test')).rejects.toThrow(
+          'Failed to create issue'
+        );
       });
     });
 
@@ -265,9 +269,9 @@ describe('MCP Server Integration', () => {
         mockLinearClient.updateIssue.mockResolvedValue({ issue: null });
 
         // Act & Assert
-        await expect(
-          linearService.updateIssue('issue-1', { title: 'Test' })
-        ).rejects.toThrow('Failed to update issue');
+        await expect(linearService.updateIssue('issue-1', { title: 'Test' })).rejects.toThrow(
+          'Failed to update issue'
+        );
       });
     });
 
@@ -303,7 +307,7 @@ describe('MCP Server Integration', () => {
     describe('get_my_issues (via search with "me")', () => {
       it('should get issues assigned to current user', async () => {
         // Act
-        const issues = await linearService.searchIssues('', undefined, undefined, 'me', 20);
+        await linearService.searchIssues('', undefined, undefined, 'me', 20);
 
         // Assert
         expect(mockLinearClient.issues).toHaveBeenCalledWith({
@@ -369,9 +373,9 @@ describe('MCP Server Integration', () => {
       mockLinearClient.createIssue.mockRejectedValue(new Error('Create Error'));
 
       // Act & Assert
-      await expect(
-        linearService.createIssue('team-1', 'Test')
-      ).rejects.toThrow('Failed to create issue in Linear');
+      await expect(linearService.createIssue('team-1', 'Test')).rejects.toThrow(
+        'Failed to create issue in Linear'
+      );
     });
 
     it('should handle update issue errors gracefully', async () => {
@@ -379,9 +383,9 @@ describe('MCP Server Integration', () => {
       mockLinearClient.updateIssue.mockRejectedValue(new Error('Update Error'));
 
       // Act & Assert
-      await expect(
-        linearService.updateIssue('issue-1', { title: 'Test' })
-      ).rejects.toThrow('Failed to update issue in Linear');
+      await expect(linearService.updateIssue('issue-1', { title: 'Test' })).rejects.toThrow(
+        'Failed to update issue in Linear'
+      );
     });
 
     // Note: Viewer errors are harder to mock due to async property access

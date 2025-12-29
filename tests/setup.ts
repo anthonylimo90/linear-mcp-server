@@ -21,4 +21,4 @@ process.env.LOG_LEVEL = 'error'; // Minimize logging during tests
 process.env.LINEAR_API_KEY = 'test-api-key';
 
 // Global test timeout
-jest.setTimeout(30000); 
+jest.setTimeout(30000);

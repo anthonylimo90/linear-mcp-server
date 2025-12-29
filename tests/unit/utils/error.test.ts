@@ -5,12 +5,9 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 describe('Error utilities', () => {
   describe('AppError', () => {
     it('should create error with all parameters', () => {
-      const error = new AppError(
-        'Test error',
-        404,
-        String(ErrorCode.InvalidRequest),
-        { foo: 'bar' }
-      );
+      const error = new AppError('Test error', 404, String(ErrorCode.InvalidRequest), {
+        foo: 'bar',
+      });
 
       expect(error.message).toBe('Test error');
       expect(error.statusCode).toBe(404);
@@ -45,12 +42,9 @@ describe('Error utilities', () => {
 
   describe('handleError', () => {
     it('should handle AppError correctly', () => {
-      const appError = new AppError(
-        'Custom error',
-        404,
-        String(ErrorCode.InvalidRequest),
-        { test: 'data' }
-      );
+      const appError = new AppError('Custom error', 404, String(ErrorCode.InvalidRequest), {
+        test: 'data',
+      });
 
       const result = handleError(appError);
 

@@ -5,7 +5,7 @@ export const mcpRequests = {
     id: 1,
     method: 'tools/list',
   },
-  
+
   searchIssues: {
     jsonrpc: '2.0',
     id: 2,
@@ -19,7 +19,7 @@ export const mcpRequests = {
       },
     },
   },
-  
+
   createIssue: {
     jsonrpc: '2.0',
     id: 3,
@@ -35,7 +35,7 @@ export const mcpRequests = {
       },
     },
   },
-  
+
   updateIssue: {
     jsonrpc: '2.0',
     id: 4,
@@ -50,7 +50,7 @@ export const mcpRequests = {
       },
     },
   },
-  
+
   getTeams: {
     jsonrpc: '2.0',
     id: 5,
@@ -60,7 +60,7 @@ export const mcpRequests = {
       arguments: {},
     },
   },
-  
+
   getMyIssues: {
     jsonrpc: '2.0',
     id: 6,
@@ -72,7 +72,7 @@ export const mcpRequests = {
       },
     },
   },
-  
+
   invalidTool: {
     jsonrpc: '2.0',
     id: 7,
@@ -82,7 +82,7 @@ export const mcpRequests = {
       arguments: {},
     },
   },
-  
+
   invalidRequest: {
     jsonrpc: '2.0',
     id: 8,
@@ -150,7 +150,7 @@ export const mcpResponses = {
     jsonrpc: '2.0',
     id: 1,
   },
-  
+
   searchIssues: {
     result: {
       toolResult: {
@@ -167,7 +167,7 @@ export const mcpResponses = {
     jsonrpc: '2.0',
     id: 2,
   },
-  
+
   createIssue: {
     result: {
       toolResult: expect.objectContaining({
@@ -180,4 +180,4 @@ export const mcpResponses = {
     jsonrpc: '2.0',
     id: 3,
   },
-}; 
+};

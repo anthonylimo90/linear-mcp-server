@@ -52,7 +52,7 @@ function validateConfig() {
       port: config.port,
       logLevel: config.logLevel,
       enableRateLimit: config.enableRateLimit,
-      environment: config.environment
+      environment: config.environment,
     });
   }
 }
@@ -60,4 +60,4 @@ function validateConfig() {
 // Call validation on import
 validateConfig();
 
-export default config; 
+export default config;

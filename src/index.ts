@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
-  McpError
-} from "@modelcontextprotocol/sdk/types.js";
-import { Issue as LinearIssue } from "@linear/sdk";
-import { logger } from "./utils/logger.js";
-import { AppError, handleError } from "./utils/error.js";
-import { linearService } from "./services/linearService.js";
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
+import { Issue as LinearIssue } from '@linear/sdk';
+import { logger } from './utils/logger.js';
+import { AppError, handleError } from './utils/error.js';
+import { linearService } from './services/linearService.js';
 import {
   SearchIssuesArgs,
   CreateIssueArgs,
@@ -28,8 +28,8 @@ import {
   HealthCheckResponse,
   Issue,
   Team,
-  WorkflowState
-} from "./types.js";
+  WorkflowState,
+} from './types.js';
 import {
   SearchIssuesSchema,
   CreateIssueSchema,
@@ -38,11 +38,11 @@ import {
   GetIssueSchema,
   GetWorkflowStatesSchema,
   AddCommentSchema,
-} from "./utils/validation.js";
-import { ZodError } from "zod";
+} from './utils/validation.js';
+import { ZodError } from 'zod';
 
 // Initialize app
-logger.debug("Starting Linear MCP server...");
+logger.debug('Starting Linear MCP server...');
 
 /**
  * Formats a Linear SDK issue into our standardized Issue format
@@ -54,7 +54,7 @@ async function formatIssue(issue: LinearIssue): Promise<Issue> {
     issue.state ? issue.state : Promise.resolve(null),
     issue.assignee ? issue.assignee : Promise.resolve(null),
     issue.team ? issue.team : Promise.resolve(null),
-    issue.project ? issue.project : Promise.resolve(null)
+    issue.project ? issue.project : Promise.resolve(null),
   ]);
 
   return {
@@ -66,29 +66,36 @@ async function formatIssue(issue: LinearIssue): Promise<Issue> {
     url: issue.url,
     assignee: assignee?.name || undefined,
     createdAt: issue.createdAt,
-    team: team ? {
-      id: team.id,
-      name: team.name,
-      key: team.key
-    } : undefined,
-    project: project ? {
-      id: project.id,
-      name: project.name,
-      url: project.url || undefined,
-      status: project.state || undefined
-    } : undefined
+    team: team
+      ? {
+          id: team.id,
+          name: team.name,
+          key: team.key,
+        }
+      : undefined,
+    project: project
+      ? {
+          id: project.id,
+          name: project.name,
+          url: project.url || undefined,
+          status: project.state || undefined,
+        }
+      : undefined,
   };
 }
 
 // Create server
-const server = new Server({
-  name: "Linear MCP Server",
-  version: "0.1.0"
-}, {
-  capabilities: {
-    tools: {}
+const server = new Server(
+  {
+    name: 'Linear MCP Server',
+    version: '0.1.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
   }
-});
+);
 
 // Helper function to search issues with error handling
 async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesResponse> {
@@ -99,13 +106,7 @@ async function searchIssues(args: SearchIssuesArgs): Promise<SearchIssuesRespons
 
     logger.debug('Searching issues', { query, teamId, status, assigneeId, limit });
 
-    const issues = await linearService.searchIssues(
-      query,
-      teamId,
-      status,
-      assigneeId,
-      limit
-    );
+    const issues = await linearService.searchIssues(query, teamId, status, assigneeId, limit);
 
     // Use shared formatting function
     const formattedIssues: Issue[] = await Promise.all(issues.map(formatIssue));
@@ -126,22 +127,16 @@ async function createIssue(args: CreateIssueArgs): Promise<CreateIssueResponse> 
     const { teamId, title, description, assigneeId, priority } = validated;
 
     logger.debug('Creating issue', { teamId, title, description, assigneeId, priority });
-    
-    const issue = await linearService.createIssue(
-      teamId,
-      title,
-      description,
-      assigneeId,
-      priority
-    );
-    
+
+    const issue = await linearService.createIssue(teamId, title, description, assigneeId, priority);
+
     const response: CreateIssueResponse = {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
-      url: issue.url
+      url: issue.url,
     };
-    
+
     logger.debug(`Created issue ${response.identifier}`, { id: response.id, url: response.url });
     return response;
   } catch (error) {
@@ -158,26 +153,26 @@ async function updateIssue(args: UpdateIssueArgs): Promise<UpdateIssueResponse> 
     const { issueId, title, description, assigneeId, priority, stateId } = validated;
 
     logger.debug('Updating issue', { issueId, title, description, assigneeId, priority, stateId });
-    
+
     const issue = await linearService.updateIssue(issueId, {
       title,
       description,
       assigneeId,
       priority,
-      stateId
+      stateId,
     });
 
     // Get the current state for status
     const state = issue.state ? await issue.state : null;
-    
+
     const response: UpdateIssueResponse = {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
       url: issue.url,
-      status: state?.name || undefined
+      status: state?.name || undefined,
     };
-    
+
     logger.debug(`Updated issue ${response.identifier}`, { id: response.id, url: response.url });
     return response;
   } catch (error) {
@@ -190,16 +185,16 @@ async function updateIssue(args: UpdateIssueArgs): Promise<UpdateIssueResponse> 
 async function getTeams(): Promise<GetTeamsResponse> {
   try {
     logger.debug('Getting teams');
-    
+
     const teams = await linearService.getTeams();
-    
+
     const formattedTeams: Team[] = teams.map(team => ({
       id: team.id,
       name: team.name,
       key: team.key,
-      description: team.description || undefined
+      description: team.description || undefined,
     }));
-    
+
     logger.debug(`Found ${formattedTeams.length} teams`);
     return { teams: formattedTeams };
   } catch (error) {
@@ -265,7 +260,7 @@ async function getWorkflowStates(args: GetWorkflowStatesArgs): Promise<GetWorkfl
       name: state.name,
       type: state.type,
       description: state.description || undefined,
-      position: state.position
+      position: state.position,
     }));
 
     logger.debug(`Found ${formattedStates.length} workflow states`);
@@ -290,7 +285,7 @@ async function addComment(args: AddCommentArgs): Promise<AddCommentResponse> {
       id: comment.id,
       body: comment.body,
       createdAt: comment.createdAt.toString(),
-      issueId: issueId
+      issueId: issueId,
     };
 
     logger.debug(`Added comment to issue`, { commentId: response.id });
@@ -314,7 +309,7 @@ async function healthCheck(): Promise<HealthCheckResponse> {
     return {
       status: 'unhealthy',
       apiConnected: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -322,174 +317,186 @@ async function healthCheck(): Promise<HealthCheckResponse> {
 // Tool definitions for MCP
 const tools = [
   {
-    name: "search_issues",
-    description: "Search for issues in Linear with powerful filtering options. Examples: 'Find all high-priority bugs assigned to me', 'Show open issues in the Engineering team', 'Search for issues about authentication'",
+    name: 'search_issues',
+    description:
+      "Search for issues in Linear with powerful filtering options. Examples: 'Find all high-priority bugs assigned to me', 'Show open issues in the Engineering team', 'Search for issues about authentication'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         query: {
-          type: "string",
-          description: "Search query - can be keywords, issue identifiers, or descriptions to search for"
+          type: 'string',
+          description:
+            'Search query - can be keywords, issue identifiers, or descriptions to search for',
         },
         teamId: {
-          type: "string",
-          description: "Team ID to filter results (use get_teams to find team IDs)"
+          type: 'string',
+          description: 'Team ID to filter results (use get_teams to find team IDs)',
         },
         status: {
-          type: "string",
-          description: "Status to filter by (e.g., 'In Progress', 'Done', 'Todo')"
+          type: 'string',
+          description: "Status to filter by (e.g., 'In Progress', 'Done', 'Todo')",
         },
         assigneeId: {
-          type: "string",
-          description: "Assignee ID to filter by. Pro tip: Use 'me' to filter by the current user"
+          type: 'string',
+          description: "Assignee ID to filter by. Pro tip: Use 'me' to filter by the current user",
         },
         limit: {
-          type: "number",
-          description: "Maximum number of issues to return (default: 50)"
-        }
+          type: 'number',
+          description: 'Maximum number of issues to return (default: 50)',
+        },
       },
-      required: ["query"]
-    }
+      required: ['query'],
+    },
   },
   {
-    name: "create_issue",
-    description: "Create a new issue in Linear with full customization. Examples: 'Create a bug report for login issues', 'Add a feature request to implement dark mode', 'Create a high-priority task and assign it to me'",
+    name: 'create_issue',
+    description:
+      "Create a new issue in Linear with full customization. Examples: 'Create a bug report for login issues', 'Add a feature request to implement dark mode', 'Create a high-priority task and assign it to me'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         teamId: {
-          type: "string",
-          description: "Team ID (use get_teams to find available teams)"
+          type: 'string',
+          description: 'Team ID (use get_teams to find available teams)',
         },
         title: {
-          type: "string",
-          description: "Issue title - should be clear and concise"
+          type: 'string',
+          description: 'Issue title - should be clear and concise',
         },
         description: {
-          type: "string",
-          description: "Detailed issue description (supports Markdown formatting)"
+          type: 'string',
+          description: 'Detailed issue description (supports Markdown formatting)',
         },
         assigneeId: {
-          type: "string",
-          description: "Assignee ID. Pro tip: Use 'me' to assign to yourself"
+          type: 'string',
+          description: "Assignee ID. Pro tip: Use 'me' to assign to yourself",
         },
         priority: {
-          type: "number",
-          description: "Issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent"
-        }
+          type: 'number',
+          description: 'Issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent',
+        },
       },
-      required: ["teamId", "title"]
-    }
+      required: ['teamId', 'title'],
+    },
   },
   {
-    name: "update_issue",
-    description: "Update an existing issue in Linear - modify title, description, assignee, priority, or workflow state. Examples: 'Update issue ENG-123 to high priority', 'Assign issue ENG-456 to me', 'Change the description of issue ENG-789'",
+    name: 'update_issue',
+    description:
+      "Update an existing issue in Linear - modify title, description, assignee, priority, or workflow state. Examples: 'Update issue ENG-123 to high priority', 'Assign issue ENG-456 to me', 'Change the description of issue ENG-789'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         issueId: {
-          type: "string",
-          description: "Issue ID to update (the unique identifier like 'ENG-123')"
+          type: 'string',
+          description: "Issue ID to update (the unique identifier like 'ENG-123')",
         },
         title: {
-          type: "string",
-          description: "New issue title"
+          type: 'string',
+          description: 'New issue title',
         },
         description: {
-          type: "string",
-          description: "New issue description (supports Markdown formatting)"
+          type: 'string',
+          description: 'New issue description (supports Markdown formatting)',
         },
         assigneeId: {
-          type: "string",
-          description: "New assignee ID. Pro tip: Use 'me' to assign to yourself, or empty string '' to unassign"
+          type: 'string',
+          description:
+            "New assignee ID. Pro tip: Use 'me' to assign to yourself, or empty string '' to unassign",
         },
         priority: {
-          type: "number",
-          description: "New issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent"
+          type: 'number',
+          description: 'New issue priority: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent',
         },
         stateId: {
-          type: "string",
-          description: "New workflow state ID (use get_workflow_states to find state IDs)"
-        }
+          type: 'string',
+          description: 'New workflow state ID (use get_workflow_states to find state IDs)',
+        },
       },
-      required: ["issueId"]
-    }
+      required: ['issueId'],
+    },
   },
   {
-    name: "get_teams",
-    description: "Get all teams in your Linear workspace. Use this to find team IDs for creating issues or filtering searches. Example: 'Show me all my Linear teams'",
+    name: 'get_teams',
+    description:
+      "Get all teams in your Linear workspace. Use this to find team IDs for creating issues or filtering searches. Example: 'Show me all my Linear teams'",
     inputSchema: {
-      type: "object",
-      properties: {}
-    }
+      type: 'object',
+      properties: {},
+    },
   },
   {
-    name: "get_my_issues",
-    description: "Get all issues assigned to you in Linear. Perfect for daily standup prep or checking your current workload. Examples: 'What issues are assigned to me?', 'Show my current tasks'",
+    name: 'get_my_issues',
+    description:
+      "Get all issues assigned to you in Linear. Perfect for daily standup prep or checking your current workload. Examples: 'What issues are assigned to me?', 'Show my current tasks'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         limit: {
-          type: "number",
-          description: "Maximum number of issues to return (default: 50, max: 250)"
-        }
-      }
-    }
+          type: 'number',
+          description: 'Maximum number of issues to return (default: 50, max: 250)',
+        },
+      },
+    },
   },
   {
-    name: "get_issue",
-    description: "Get detailed information about a specific issue by its ID. Examples: 'Get the details of issue ENG-123', 'Show me issue PROJ-456'",
+    name: 'get_issue',
+    description:
+      "Get detailed information about a specific issue by its ID. Examples: 'Get the details of issue ENG-123', 'Show me issue PROJ-456'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         issueId: {
-          type: "string",
-          description: "The unique ID of the issue to retrieve (e.g., 'abc123-def456-...'). Note: This is the internal UUID, not the identifier like 'ENG-123'"
-        }
+          type: 'string',
+          description:
+            "The unique ID of the issue to retrieve (e.g., 'abc123-def456-...'). Note: This is the internal UUID, not the identifier like 'ENG-123'",
+        },
       },
-      required: ["issueId"]
-    }
+      required: ['issueId'],
+    },
   },
   {
-    name: "get_workflow_states",
-    description: "Get all workflow states (statuses) for a specific team. Use this to find state IDs when updating issues. Examples: 'Show workflow states for the Engineering team', 'What statuses are available?'",
+    name: 'get_workflow_states',
+    description:
+      "Get all workflow states (statuses) for a specific team. Use this to find state IDs when updating issues. Examples: 'Show workflow states for the Engineering team', 'What statuses are available?'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         teamId: {
-          type: "string",
-          description: "The ID of the team (use get_teams to find team IDs)"
-        }
+          type: 'string',
+          description: 'The ID of the team (use get_teams to find team IDs)',
+        },
       },
-      required: ["teamId"]
-    }
+      required: ['teamId'],
+    },
   },
   {
-    name: "add_comment",
-    description: "Add a comment to an existing issue in Linear. Comments support Markdown formatting. Examples: 'Add a comment to issue ENG-123', 'Comment on the bug report with an update'",
+    name: 'add_comment',
+    description:
+      "Add a comment to an existing issue in Linear. Comments support Markdown formatting. Examples: 'Add a comment to issue ENG-123', 'Comment on the bug report with an update'",
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         issueId: {
-          type: "string",
-          description: "The ID of the issue to comment on"
+          type: 'string',
+          description: 'The ID of the issue to comment on',
         },
         body: {
-          type: "string",
-          description: "The comment text (supports Markdown formatting for rich text)"
-        }
+          type: 'string',
+          description: 'The comment text (supports Markdown formatting for rich text)',
+        },
       },
-      required: ["issueId", "body"]
-    }
+      required: ['issueId', 'body'],
+    },
   },
   {
-    name: "health_check",
-    description: "Verify that the Linear API connection is working and check authentication status. Use this to troubleshoot connection issues. Example: 'Check if Linear API is working'",
+    name: 'health_check',
+    description:
+      "Verify that the Linear API connection is working and check authentication status. Use this to troubleshoot connection issues. Example: 'Check if Linear API is working'",
     inputSchema: {
-      type: "object",
-      properties: {}
-    }
-  }
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 // Register tool list handler
@@ -498,13 +505,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Handle tool calls with error handling
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args = {} } = request.params;
   logger.debug(`Handling tool call: ${name}`, { arguments: args });
 
   try {
     let result;
-    
+
     switch (name) {
       case 'search_issues': {
         // Type guard validation
@@ -516,7 +523,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           teamId: args.teamId as string,
           status: args.status as string,
           assigneeId: args.assigneeId as string,
-          limit: args.limit as number
+          limit: args.limit as number,
         });
         break;
       }
@@ -530,7 +537,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           title: args.title,
           description: args.description as string,
           assigneeId: args.assigneeId as string,
-          priority: args.priority as number
+          priority: args.priority as number,
         });
         break;
       }
@@ -545,7 +552,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           description: args.description as string,
           assigneeId: args.assigneeId as string,
           priority: args.priority as number,
-          stateId: args.stateId as string
+          stateId: args.stateId as string,
         });
         break;
       }
@@ -588,25 +595,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     logger.debug(`Tool call ${name} completed successfully`);
     return { toolResult: result };
-
   } catch (error: unknown) {
     // Handle Zod validation errors
     if (error instanceof ZodError) {
-      const validationErrors = error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Validation error: ${validationErrors}`,
-        { code: 'VALIDATION_ERROR', details: error.errors }
-      );
+      const validationErrors = error.errors
+        .map(err => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      throw new McpError(ErrorCode.InvalidParams, `Validation error: ${validationErrors}`, {
+        code: 'VALIDATION_ERROR',
+        details: error.errors,
+      });
     }
 
     // Convert error to proper McpError format
     const errorResponse = handleError(error);
-    throw new McpError(
-      errorResponse.statusCode || 500,
-      errorResponse.message,
-      { code: errorResponse.code || String(ErrorCode.InternalError), details: errorResponse.details }
-    );
+    throw new McpError(errorResponse.statusCode || 500, errorResponse.message, {
+      code: errorResponse.code || String(ErrorCode.InternalError),
+      details: errorResponse.details,
+    });
   }
 });
 
@@ -615,9 +621,11 @@ async function startServer() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    logger.debug("Linear MCP Server started and ready to accept connections");
+    logger.debug('Linear MCP Server started and ready to accept connections');
   } catch (error: unknown) {
-    logger.error("Failed to start server", { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to start server', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   }
 }
