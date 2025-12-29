@@ -80,7 +80,7 @@ Once set up, you can ask Claude to:
 ### Code Quality
 - **Type Safety**: Fully typed interfaces with no `any` types
 - **JSDoc Documentation**: Comprehensive API documentation with examples
-- **Test Coverage**: 64.59% overall coverage with 55 passing tests
+- **Test Coverage**: 98.89% statement coverage with 170 passing tests
 - **Clean Architecture**: Service layer with singleton pattern
 - **Logging**: Advanced logging with Pino (stderr-only, no stdout pollution)
 - **MCP Protocol Compliance**: Full adherence to Model Context Protocol standards
@@ -95,7 +95,7 @@ Once set up, you can ask Claude to:
 - ✅ **Validation**: Zod schemas for all inputs with helpful error messages
 - ✅ **Documentation**: Comprehensive JSDoc with examples for all methods
 - ✅ **Type Safety**: Eliminated all `any` types for better TypeScript support
-- ✅ **Testing**: 55 passing tests with 64.59% code coverage
+- ✅ **Testing**: 170 passing tests with 98.89% code coverage
 - ✅ **Error Context**: Detailed error messages with relevant parameters
 
 ## Architecture
@@ -790,9 +790,9 @@ npm test -- tests/unit/services/linearService.test.ts
 ```
 
 **Current Test Coverage:**
-- Overall: 64.59% statement coverage
-- linearService.ts: 70.21% coverage
-- 55 passing tests across unit and integration suites
+- Overall: 98.89% statement coverage
+- linearService.ts: 98.24% coverage
+- 170 passing tests across unit and integration suites
 
 Tests include:
 - Unit tests for LinearService methods

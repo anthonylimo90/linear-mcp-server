@@ -14,11 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Mock Strategy**: Comprehensive mocking approach for Linear SDK and MCP protocol
   - **Test Fixtures**: Realistic test data based on actual Linear API responses
   - **Coverage Reporting**: HTML, LCOV, and console coverage reports with configurable targets
-- **Testing Documentation**: Detailed testing strategy and best practices guide
+- **Testing Best Practices**: Comprehensive test suite following industry standards
   - **Testing Pyramid**: Unit (76%), Integration (20%), E2E (4%) distribution
   - **Test Categories**: Service layer, utilities, MCP protocol, and performance testing
   - **Mock Patterns**: Linear SDK mocking, environment mocking, and transport mocking
-  - **Best Practices**: AAA pattern, isolated tests, descriptive naming, error scenario coverage
 - **Test Scripts**: Multiple test execution modes for different development workflows
   - `npm test` - Run all tests with coverage
   - `npm run test:unit` - Unit tests only  
