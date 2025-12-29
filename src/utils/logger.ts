@@ -30,7 +30,7 @@ const SENSITIVE_FIELDS = [
  * @param data - Object that may contain sensitive data
  * @returns Redacted copy of the object
  */
-function redactSensitiveData(data: any): any {
+function redactSensitiveData(data: unknown): unknown {
   if (!data || typeof data !== 'object') {
     return data;
   }
@@ -39,8 +39,8 @@ function redactSensitiveData(data: any): any {
     return data.map(item => redactSensitiveData(item));
   }
 
-  const redacted: any = {};
-  for (const [key, value] of Object.entries(data)) {
+  const redacted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     const lowerKey = key.toLowerCase();
     const isSensitive = SENSITIVE_FIELDS.some(field => lowerKey.includes(field.toLowerCase()));
 

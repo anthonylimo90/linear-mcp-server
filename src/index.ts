@@ -8,10 +8,9 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Issue as LinearIssue } from '@linear/sdk';
 import { logger } from './utils/logger.js';
 import { AppError, handleError } from './utils/error.js';
-import { linearService } from './services/linearService.js';
+import { linearService, formatIssue } from './services/linearService.js';
 import {
   SearchIssuesArgs,
   CreateIssueArgs,
@@ -43,46 +42,6 @@ import { ZodError } from 'zod';
 
 // Initialize app
 logger.debug('Starting Linear MCP server...');
-
-/**
- * Formats a Linear SDK issue into our standardized Issue format
- * @param issue - Linear SDK issue object
- * @returns Promise resolving to formatted Issue
- */
-async function formatIssue(issue: LinearIssue): Promise<Issue> {
-  const [state, assignee, team, project] = await Promise.all([
-    issue.state ? issue.state : Promise.resolve(null),
-    issue.assignee ? issue.assignee : Promise.resolve(null),
-    issue.team ? issue.team : Promise.resolve(null),
-    issue.project ? issue.project : Promise.resolve(null),
-  ]);
-
-  return {
-    id: issue.id,
-    identifier: issue.identifier,
-    title: issue.title,
-    description: issue.description || undefined,
-    status: state?.name || undefined,
-    url: issue.url,
-    assignee: assignee?.name || undefined,
-    createdAt: issue.createdAt,
-    team: team
-      ? {
-          id: team.id,
-          name: team.name,
-          key: team.key,
-        }
-      : undefined,
-    project: project
-      ? {
-          id: project.id,
-          name: project.name,
-          url: project.url || undefined,
-          status: project.state || undefined,
-        }
-      : undefined,
-  };
-}
 
 // Create server
 const server = new Server(
@@ -255,7 +214,7 @@ async function getWorkflowStates(args: GetWorkflowStatesArgs): Promise<GetWorkfl
     logger.debug('Fetching workflow states', { teamId });
     const states = await linearService.getWorkflowStates(teamId);
 
-    const formattedStates: WorkflowState[] = states.map((state: any) => ({
+    const formattedStates: WorkflowState[] = states.map(state => ({
       id: state.id,
       name: state.name,
       type: state.type,
@@ -512,80 +471,33 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   try {
     let result;
 
+    // All input validation is handled by Zod schemas in each helper function
+    // Type assertions use double cast since MCP args are Record<string, unknown>
     switch (name) {
-      case 'search_issues': {
-        // Type guard validation
-        if (typeof args.query !== 'string') {
-          throw new AppError('Search query is required', 400, 'VALIDATION_ERROR');
-        }
-        result = await searchIssues({
-          query: args.query,
-          teamId: args.teamId as string,
-          status: args.status as string,
-          assigneeId: args.assigneeId as string,
-          limit: args.limit as number,
-        });
+      case 'search_issues':
+        result = await searchIssues(args as unknown as SearchIssuesArgs);
         break;
-      }
-      case 'create_issue': {
-        // Type guard validation
-        if (typeof args.teamId !== 'string' || typeof args.title !== 'string') {
-          throw new AppError('Team ID and title are required', 400, 'VALIDATION_ERROR');
-        }
-        result = await createIssue({
-          teamId: args.teamId,
-          title: args.title,
-          description: args.description as string,
-          assigneeId: args.assigneeId as string,
-          priority: args.priority as number,
-        });
+      case 'create_issue':
+        result = await createIssue(args as unknown as CreateIssueArgs);
         break;
-      }
-      case 'update_issue': {
-        // Type guard validation
-        if (typeof args.issueId !== 'string') {
-          throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
-        }
-        result = await updateIssue({
-          issueId: args.issueId,
-          title: args.title as string,
-          description: args.description as string,
-          assigneeId: args.assigneeId as string,
-          priority: args.priority as number,
-          stateId: args.stateId as string,
-        });
+      case 'update_issue':
+        result = await updateIssue(args as unknown as UpdateIssueArgs);
         break;
-      }
       case 'get_teams':
         result = await getTeams();
         break;
       case 'get_my_issues':
         result = await getMyIssues(args as { limit?: number });
         break;
-      case 'get_issue': {
-        // Type guard validation
-        if (typeof args.issueId !== 'string') {
-          throw new AppError('Issue ID is required', 400, 'VALIDATION_ERROR');
-        }
-        result = await getIssue({ issueId: args.issueId });
+      case 'get_issue':
+        result = await getIssue(args as unknown as GetIssueArgs);
         break;
-      }
-      case 'get_workflow_states': {
-        // Type guard validation
-        if (typeof args.teamId !== 'string') {
-          throw new AppError('Team ID is required', 400, 'VALIDATION_ERROR');
-        }
-        result = await getWorkflowStates({ teamId: args.teamId });
+      case 'get_workflow_states':
+        result = await getWorkflowStates(args as unknown as GetWorkflowStatesArgs);
         break;
-      }
-      case 'add_comment': {
-        // Type guard validation
-        if (typeof args.issueId !== 'string' || typeof args.body !== 'string') {
-          throw new AppError('Issue ID and comment body are required', 400, 'VALIDATION_ERROR');
-        }
-        result = await addComment({ issueId: args.issueId, body: args.body });
+      case 'add_comment':
+        result = await addComment(args as unknown as AddCommentArgs);
         break;
-      }
       case 'health_check':
         result = await healthCheck();
         break;

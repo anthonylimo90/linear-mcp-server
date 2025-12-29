@@ -56,7 +56,9 @@ describe('Logging middleware', () => {
       requestLogger(mockRequest as Request, mockResponse as Response, mockNext);
 
       const responseBody = { result: 'success' };
-      mockResponse.send!(responseBody as any);
+      if (mockResponse.send) {
+        mockResponse.send(responseBody);
+      }
 
       // Assert
       expect(originalSend).toHaveBeenCalledWith(responseBody);

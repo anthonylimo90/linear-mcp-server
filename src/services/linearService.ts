@@ -1,4 +1,12 @@
-import { LinearClient, Team, Issue, User, WorkflowState, Comment } from '@linear/sdk';
+import {
+  LinearClient,
+  Team,
+  Issue as LinearIssue,
+  User,
+  WorkflowState,
+  Comment,
+} from '@linear/sdk';
+import type { Issue } from '../types.js';
 import pThrottle from 'p-throttle';
 import config from '../utils/config.js';
 import { logger } from '../utils/logger.js';
@@ -106,7 +114,11 @@ async function withRetry<T>(
 /**
  * Helper to handle errors consistently across all methods
  */
-function handleLinearError(error: unknown, context: string, params?: Record<string, any>): never {
+function handleLinearError(
+  error: unknown,
+  context: string,
+  params?: Record<string, unknown>
+): never {
   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
   const errorDetails = error instanceof Error ? { error } : undefined;
 
@@ -140,7 +152,7 @@ function handleLinearError(error: unknown, context: string, params?: Record<stri
  */
 export class LinearService {
   private client: LinearClient;
-  private static instance: LinearService;
+  private static instance: LinearService | undefined;
   private viewerCache?: User;
   private viewerCacheExpiry?: number;
   private teamsCache?: CacheEntry<Team[]>;
@@ -170,7 +182,7 @@ export class LinearService {
    * @internal
    */
   public static resetInstance(): void {
-    LinearService.instance = undefined as any;
+    LinearService.instance = undefined;
   }
 
   /**
@@ -269,7 +281,7 @@ export class LinearService {
     status?: string,
     assigneeId?: string,
     limit = 50
-  ): Promise<Issue[]> {
+  ): Promise<LinearIssue[]> {
     try {
       // Cap the limit at 250 for performance reasons
       const cappedLimit = Math.min(limit, 250);
@@ -355,7 +367,7 @@ export class LinearService {
     description?: string,
     assigneeId?: string,
     priority?: number
-  ): Promise<Issue> {
+  ): Promise<LinearIssue> {
     try {
       logger.debug('Creating issue in Linear', {
         teamId,
@@ -457,7 +469,7 @@ export class LinearService {
    * console.log(issue.title, issue.status);
    * ```
    */
-  public async getIssue(issueId: string): Promise<Issue> {
+  public async getIssue(issueId: string): Promise<LinearIssue> {
     return throttle(async () => {
       try {
         logger.debug('Fetching issue from Linear', { issueId });
@@ -609,7 +621,7 @@ export class LinearService {
       priority?: number;
       stateId?: string;
     }
-  ): Promise<Issue> {
+  ): Promise<LinearIssue> {
     try {
       logger.debug('Updating issue in Linear', { issueId, updates });
 
@@ -646,3 +658,43 @@ export class LinearService {
 
 // Export singleton instance
 export const linearService = LinearService.getInstance();
+
+/**
+ * Formats a Linear SDK issue into our standardized Issue format
+ * @param issue - Linear SDK issue object
+ * @returns Promise resolving to formatted Issue
+ */
+export async function formatIssue(issue: LinearIssue): Promise<Issue> {
+  const [state, assignee, team, project] = await Promise.all([
+    issue.state ? issue.state : Promise.resolve(null),
+    issue.assignee ? issue.assignee : Promise.resolve(null),
+    issue.team ? issue.team : Promise.resolve(null),
+    issue.project ? issue.project : Promise.resolve(null),
+  ]);
+
+  return {
+    id: issue.id,
+    identifier: issue.identifier,
+    title: issue.title,
+    description: issue.description || undefined,
+    status: state?.name || undefined,
+    url: issue.url,
+    assignee: assignee?.name || undefined,
+    createdAt: issue.createdAt,
+    team: team
+      ? {
+          id: team.id,
+          name: team.name,
+          key: team.key,
+        }
+      : undefined,
+    project: project
+      ? {
+          id: project.id,
+          name: project.name,
+          url: project.url || undefined,
+          status: project.state || undefined,
+        }
+      : undefined,
+  };
+}

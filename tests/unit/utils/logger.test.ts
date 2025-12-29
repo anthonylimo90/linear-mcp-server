@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { Logger, redactSensitiveData, AppError, handleError } from '../../../src/utils/logger.js';
 
+// Helper type for redacted objects in tests
+type RedactedObject = Record<string, unknown>;
+
 describe('Logger', () => {
   let logger: Logger;
 
@@ -89,7 +92,7 @@ describe('redactSensitiveData', () => {
         { name: 'item1', apiKey: 'secret123456' },
         { name: 'item2', password: 'pass123456' },
       ];
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject[];
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('item1');
@@ -113,7 +116,7 @@ describe('redactSensitiveData', () => {
   describe('object inputs', () => {
     it('should redact password fields', () => {
       const input = { username: 'user', password: 'secretpassword' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.username).toBe('user');
       // "secretpassword" (14 chars): 4 visible + min(10, 20) = 10 stars
@@ -122,7 +125,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact apiKey fields', () => {
       const input = { apiKey: 'lin_api_12345678' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "lin_api_12345678" (16 chars): 4 visible + min(12, 20) = 12 stars
       expect(result.apiKey).toBe('lin_************');
@@ -130,7 +133,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact api_key fields', () => {
       const input = { api_key: 'my_secret_key_123' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "my_secret_key_123" (17 chars): 4 visible + min(13, 20) = 13 stars
       expect(result.api_key).toBe('my_s*************');
@@ -138,7 +141,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact LINEAR_API_KEY fields', () => {
       const input = { LINEAR_API_KEY: 'lin_api_abcdefgh' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "lin_api_abcdefgh" (16 chars): 4 visible + min(12, 20) = 12 stars
       expect(result.LINEAR_API_KEY).toBe('lin_************');
@@ -146,7 +149,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact token fields', () => {
       const input = { token: 'bearer_token_value' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "bearer_token_value" (18 chars): 4 visible + min(14, 20) = 14 stars
       expect(result.token).toBe('bear**************');
@@ -154,7 +157,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact accessToken fields', () => {
       const input = { accessToken: 'access_token_12345' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "access_token_12345" (18 chars): 4 visible + min(14, 20) = 14 stars
       expect(result.accessToken).toBe('acce**************');
@@ -162,7 +165,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact refreshToken fields', () => {
       const input = { refreshToken: 'refresh_token_value' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "refresh_token_value" (19 chars): 4 visible + min(15, 20) = 15 stars
       expect(result.refreshToken).toBe('refr***************');
@@ -170,7 +173,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact secret fields', () => {
       const input = { secret: 'my_secret_value' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "my_secret_value" (15 chars): 4 visible + min(11, 20) = 11 stars
       expect(result.secret).toBe('my_s***********');
@@ -178,7 +181,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact privateKey fields', () => {
       const input = { privateKey: 'private_key_content' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "private_key_content" (19 chars): 4 visible + min(15, 20) = 15 stars
       expect(result.privateKey).toBe('priv***************');
@@ -186,7 +189,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact authorization fields', () => {
       const input = { authorization: 'Bearer xyz123456' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "Bearer xyz123456" (16 chars): 4 visible + min(12, 20) = 12 stars
       expect(result.authorization).toBe('Bear************');
@@ -194,7 +197,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact cookie fields', () => {
       const input = { cookie: 'session=abc123' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "session=abc123" (14 chars): 4 visible + min(10, 20) = 10 stars
       expect(result.cookie).toBe('sess**********');
@@ -202,7 +205,7 @@ describe('redactSensitiveData', () => {
 
     it('should redact session fields', () => {
       const input = { session: 'session_data_here' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "session_data_here" (17 chars): 4 visible + min(13, 20) = 13 stars
       expect(result.session).toBe('sess*************');
@@ -214,7 +217,7 @@ describe('redactSensitiveData', () => {
         ApiKey: 'mixedCaseKey12345',
         linearapikey: 'lowercasekey12345',
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // "uppercasepassword" (17 chars): 4 visible + min(13, 20) = 13 stars
       expect(result.PASSWORD).toBe('uppe*************');
@@ -229,7 +232,7 @@ describe('redactSensitiveData', () => {
         myApiKeyValue: 'some_api_key_here',
         userPassword: 'user_password_123',
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.myApiKeyValue).toBe('some*************');
       expect(result.userPassword).toBe('user*************');
@@ -242,7 +245,7 @@ describe('redactSensitiveData', () => {
         token: 'xy',
         secret: 'z',
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.apiKey).toBe('****');
       expect(result.password).toBe('****');
@@ -252,7 +255,7 @@ describe('redactSensitiveData', () => {
 
     it('should handle exactly 5 character sensitive values', () => {
       const input = { apiKey: '12345' };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.apiKey).toBe('1234*');
     });
@@ -266,7 +269,9 @@ describe('redactSensitiveData', () => {
           },
         },
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as {
+        config: { apiKey: string; server: { password: string } };
+      };
 
       // "nested_api_key123" (17 chars): 4 visible + min(13, 20) = 13 stars
       expect(result.config.apiKey).toBe('nest*************');
@@ -282,7 +287,7 @@ describe('redactSensitiveData', () => {
         active: true,
         apiKey: 'secret_key_12345',
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.name).toBe('Test User');
       expect(result.email).toBe('user@example.com');
@@ -297,7 +302,7 @@ describe('redactSensitiveData', () => {
         apiKey: null,
         password: 'test_password_123',
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       expect(result.apiKey).toBeNull();
       // "test_password_123" (17 chars): 4 visible + min(13, 20) = 13 stars
@@ -310,7 +315,7 @@ describe('redactSensitiveData', () => {
         password: true,
         token: { nested: 'value' },
       };
-      const result = redactSensitiveData(input);
+      const result = redactSensitiveData(input) as RedactedObject;
 
       // Non-string sensitive values are not redacted but processed recursively if objects
       expect(result.apiKey).toBe(12345);
