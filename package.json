@@ -34,7 +34,7 @@
     "@modelcontextprotocol/sdk": "^1.11.4",
     "dotenv": "^16.5.0",
     "p-throttle": "^8.1.0",
-    "pino": "^9.7.0",
+    "pino": "^10.1.0",
     "pino-pretty": "^10.2.3",
     "zod": "^3.25.76"
   },
