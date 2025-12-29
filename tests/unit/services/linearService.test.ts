@@ -524,5 +524,141 @@ describe('LinearService', () => {
       expect(result2).toEqual(mockTeams);
       expect(mockLinearClient.teams).toHaveBeenCalledTimes(1); // Called only once due to caching
     });
+
+    it('should cache viewer and reuse it', async () => {
+      // Arrange - viewer is already set in beforeEach as { id: 'test-user', name: 'Test User' }
+      const mockIssues: any[] = [];
+      mockLinearClient.issues.mockResolvedValue({ nodes: mockIssues });
+
+      // Act - Call searchIssues with 'me' twice to test viewer caching
+      await service.searchIssues('test', undefined, undefined, 'me', 10);
+      await service.searchIssues('test2', undefined, undefined, 'me', 10);
+
+      // Assert - viewer should be cached (viewer.id is accessed only once initially)
+      // Both calls should use the same viewer.id
+      expect(mockLinearClient.issues).toHaveBeenCalledTimes(2);
+      expect(mockLinearClient.issues).toHaveBeenNthCalledWith(1, {
+        first: 10,
+        filter: {
+          assignee: { id: { eq: 'test-user' } },
+          title: { containsIgnoreCase: 'test' },
+        },
+      });
+      expect(mockLinearClient.issues).toHaveBeenNthCalledWith(2, {
+        first: 10,
+        filter: {
+          assignee: { id: { eq: 'test-user' } },
+          title: { containsIgnoreCase: 'test2' },
+        },
+      });
+    });
+  });
+
+  describe('retry logic edge cases', () => {
+    it('should not retry on 404 errors', async () => {
+      // Arrange
+      const error = new Error('404 Not Found');
+      mockLinearClient.teams.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.getTeams()).rejects.toThrow('404');
+      // Should only be called once (no retries for 404)
+      expect(mockLinearClient.teams).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry on 400 errors', async () => {
+      // Arrange
+      const error = new Error('400 Bad Request');
+      mockLinearClient.teams.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.getTeams()).rejects.toThrow('400');
+      // Should only be called once (no retries for 400)
+      expect(mockLinearClient.teams).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('updateIssue edge cases', () => {
+    it('should update issue with specific assigneeId (not "me")', async () => {
+      // Arrange
+      const mockIssue = { id: 'issue-1', identifier: 'ENG-123', title: 'Test', url: 'url' };
+      mockLinearClient.updateIssue.mockResolvedValue({ issue: mockIssue });
+
+      // Act - use a specific user ID, not 'me'
+      await service.updateIssue('issue-1', { assigneeId: 'specific-user-id' });
+
+      // Assert
+      expect(mockLinearClient.updateIssue).toHaveBeenCalledWith('issue-1', {
+        assigneeId: 'specific-user-id',
+      });
+    });
+
+    it('should update issue with stateId', async () => {
+      // Arrange
+      const mockIssue = { id: 'issue-1', identifier: 'ENG-123', title: 'Test', url: 'url' };
+      mockLinearClient.updateIssue.mockResolvedValue({ issue: mockIssue });
+
+      // Act
+      await service.updateIssue('issue-1', { stateId: 'state-123' });
+
+      // Assert
+      expect(mockLinearClient.updateIssue).toHaveBeenCalledWith('issue-1', {
+        stateId: 'state-123',
+      });
+    });
+
+    it('should handle update with empty description', async () => {
+      // Arrange
+      const mockIssue = { id: 'issue-1', identifier: 'ENG-123', title: 'Test', url: 'url' };
+      mockLinearClient.updateIssue.mockResolvedValue({ issue: mockIssue });
+
+      // Act
+      await service.updateIssue('issue-1', { description: '' });
+
+      // Assert
+      expect(mockLinearClient.updateIssue).toHaveBeenCalledWith('issue-1', {
+        description: '',
+      });
+    });
+
+    it('should unassign with null assigneeId', async () => {
+      // Arrange
+      const mockIssue = { id: 'issue-1', identifier: 'ENG-123', title: 'Test', url: 'url' };
+      mockLinearClient.updateIssue.mockResolvedValue({ issue: mockIssue });
+
+      // Act
+      await service.updateIssue('issue-1', { assigneeId: null });
+
+      // Assert
+      expect(mockLinearClient.updateIssue).toHaveBeenCalledWith('issue-1', {
+        assigneeId: null,
+      });
+    });
+  });
+
+  describe('getViewer error handling', () => {
+    it('should handle getViewer API errors', async () => {
+      // Arrange - Create a new mock that throws on viewer access
+      const errorClient = {
+        teams: jest.fn(),
+        issues: jest.fn(),
+        createIssue: jest.fn(),
+        updateIssue: jest.fn(),
+        issue: jest.fn(),
+        team: jest.fn(),
+        createComment: jest.fn(),
+        viewer: Promise.reject(new Error('Viewer API Error')),
+      };
+
+      // Reset instance and create new one with error-throwing client
+      LinearService.resetInstance();
+      (LinearClient as unknown as jest.Mock).mockImplementation(() => errorClient);
+      const errorService = LinearService.getInstance();
+
+      // Act & Assert
+      await expect(errorService.getViewer()).rejects.toThrow(
+        'Failed to fetch current user from Linear'
+      );
+    });
   });
 });

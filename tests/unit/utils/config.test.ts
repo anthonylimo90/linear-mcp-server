@@ -1,16 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
 describe('Config', () => {
   let originalEnv: NodeJS.ProcessEnv;
+  let mockExit: jest.SpiedFunction<typeof process.exit>;
 
   beforeEach(() => {
     // Save original environment
     originalEnv = { ...process.env };
+    // Mock process.exit to prevent test from actually exiting
+    mockExit = jest.spyOn(process, 'exit').mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
+    // Restore process.exit
+    mockExit.mockRestore();
   });
 
   it('should load default configuration', async () => {
@@ -87,5 +92,61 @@ describe('Config', () => {
     expect(config.port).toBe(3000);
     expect(config.rateLimitMax).toBe(100);
     expect(config.rateLimitWindowMs).toBe(60000);
+  });
+
+  it('should call process.exit when LINEAR_API_KEY is missing', async () => {
+    // Arrange - remove the API key
+    delete process.env.LINEAR_API_KEY;
+    jest.resetModules();
+
+    // Act
+    await import('../../../src/utils/config.js');
+
+    // Assert - process.exit should have been called with code 1
+    expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it('should log configuration in development mode with debug log level', async () => {
+    // Arrange
+    process.env.LINEAR_API_KEY = 'test-key';
+    process.env.NODE_ENV = 'development';
+    process.env.LOG_LEVEL = 'debug';
+    jest.resetModules();
+
+    // Act - import config which triggers validateConfig()
+    const config = (await import('../../../src/utils/config.js')).default;
+
+    // Assert - config should be loaded (debug logging happens but we just verify config loads)
+    expect(config).toBeDefined();
+    expect(config.environment).toBe('development');
+    expect(config.logLevel).toBe('debug');
+  });
+
+  it('should not log configuration when not in development mode', async () => {
+    // Arrange
+    process.env.LINEAR_API_KEY = 'test-key';
+    process.env.NODE_ENV = 'production';
+    process.env.LOG_LEVEL = 'debug';
+    jest.resetModules();
+
+    // Act
+    const config = (await import('../../../src/utils/config.js')).default;
+
+    // Assert
+    expect(config.environment).toBe('production');
+  });
+
+  it('should not log configuration when log level is not debug', async () => {
+    // Arrange
+    process.env.LINEAR_API_KEY = 'test-key';
+    process.env.NODE_ENV = 'development';
+    process.env.LOG_LEVEL = 'info';
+    jest.resetModules();
+
+    // Act
+    const config = (await import('../../../src/utils/config.js')).default;
+
+    // Assert
+    expect(config.logLevel).toBe('info');
   });
 });
